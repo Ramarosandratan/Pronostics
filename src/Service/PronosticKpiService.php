@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\PronosticMetric;
 use App\Entity\PronosticSnapshot;
+use Doctrine\DBAL\Exception\TableNotFoundException;
 use Doctrine\ORM\EntityManagerInterface;
 
 class PronosticKpiService
@@ -17,7 +18,15 @@ class PronosticKpiService
      */
     public function buildDashboard(?\DateTimeImmutable $from = null, ?\DateTimeImmutable $to = null): array
     {
-        $snapshots = $this->loadSnapshots($from, $to);
+        try {
+            $snapshots = $this->loadSnapshots($from, $to);
+        } catch (\Throwable $exception) {
+            if (!self::isMissingTableException($exception)) {
+                throw $exception;
+            }
+
+            $snapshots = [];
+        }
 
         $totalSnapshots = count($snapshots);
         $fullyComparable = 0;
@@ -122,5 +131,16 @@ class PronosticKpiService
         }
 
         return $metricSums[$metricType] / $metricCounts[$metricType];
+    }
+
+    private static function isMissingTableException(\Throwable $exception): bool
+    {
+        if ($exception instanceof TableNotFoundException) {
+            return true;
+        }
+
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'relation') && str_contains($message, 'does not exist');
     }
 }
