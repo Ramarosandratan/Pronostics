@@ -5,3 +5,16 @@ services:
     ports:
       - "5432"
 ###< doctrine/doctrine-bundle ###
+
+###> symfony/webpack-encore-bundle ###
+  app:
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: dev
+    command: /bin/bash -c "composer install && php -S 0.0.0.0:8000 -t public"
+
+  node:
+    stdin_open: true
+    tty: true
+###< symfony/webpack-encore-bundle ###

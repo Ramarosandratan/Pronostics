@@ -1,0 +1,51 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Participations{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Participations</h1>
+        <p class="muted">Affichage des 150 dernieres participations.</p>
+    </section>
+
+    <section class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Course</th>
+                    <th>Cheval</th>
+                    <th>Jockey</th>
+                    <th>Entraineur</th>
+                    <th>Proprietaire</th>
+                    <th>N° selle</th>
+                    <th>Place</th>
+                    <th>Cote</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in participations %}
+                    <tr>
+                        <td>{{ p.id }}</td>
+                        <td>
+                            {{ p.race.raceDate ? p.race.raceDate|date('Y-m-d') : 'N/A' }}
+                            {{ p.race.hippodrome }}
+                            R{{ p.race.meetingNumber }}C{{ p.race.raceNumber }}
+                        </td>
+                        <td>{{ p.horse.name }}</td>
+                        <td>{{ p.jockey ? p.jockey.name : '-' }}</td>
+                        <td>{{ p.trainer ? p.trainer.name : '-' }}</td>
+                        <td>{{ p.owner ? p.owner.name : '-' }}</td>
+                        <td>{{ p.saddleNumber ?: '-' }}</td>
+                        <td>{{ p.finishingPosition ?: '-' }}</td>
+                        <td>{{ p.odds ?: '-' }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="9">Aucune participation enregistree.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

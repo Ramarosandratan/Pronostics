@@ -1,0 +1,49 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Chevaux{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Chevaux</h1>
+        <form method="post">
+            <label for="name">Nom</label>
+            <input id="name" name="name" type="text" required maxlength="255" placeholder="Ex: KHEOPS" />
+
+            <label for="sex">Sexe (optionnel)</label>
+            <select id="sex" name="sex">
+                <option value="">Non renseigne</option>
+                <option value="M">M</option>
+                <option value="F">F</option>
+                <option value="H">H</option>
+            </select>
+
+            <button type="submit">Ajouter</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Liste</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nom</th>
+                    <th>Sexe</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for horse in horses %}
+                    <tr>
+                        <td>{{ horse.id }}</td>
+                        <td>{{ horse.name }}</td>
+                        <td>{{ horse.sex ?: '-' }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3">Aucun cheval enregistre.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}
