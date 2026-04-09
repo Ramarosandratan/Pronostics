@@ -1,0 +1,110 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Dashboard KPI{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Dashboard KPI pronostics</h1>
+        <p class="muted">Suivi des performances entre pronostics snapshots et resultats reels.</p>
+
+        <form method="get" class="inline-form">
+            <label for="from">Du</label>
+            <input id="from" type="date" name="from" value="{{ filters.from }}" />
+            <label for="to">Au</label>
+            <input id="to" type="date" name="to" value="{{ filters.to }}" />
+            <button type="submit">Filtrer</button>
+            <a href="{{ path('app_management_dashboard') }}">Reinitialiser</a>
+        </form>
+
+        <div class="stats" style="margin-top: 12px;">
+            <div class="stat">
+                <strong>{{ summary.total_snapshots }}</strong><br />
+                Snapshots
+            </div>
+            <div class="stat">
+                <strong>{{ (summary.coverage * 100)|number_format(1, '.', ' ') }}%</strong><br />
+                Couverture
+            </div>
+            <div class="stat">
+                <strong>{{ (summary.top1_accuracy * 100)|number_format(1, '.', ' ') }}%</strong><br />
+                Top 1 accuracy
+            </div>
+            <div class="stat">
+                <strong>{{ (summary.top3_hit_rate * 100)|number_format(1, '.', ' ') }}%</strong><br />
+                Top 3 hit rate
+            </div>
+            <div class="stat">
+                <strong>{{ summary.mean_rank_error|number_format(2, '.', ' ') }}</strong><br />
+                Erreur moyenne de rang
+            </div>
+            <div class="stat">
+                <strong>{{ (summary.ndcg_at_5 * 100)|number_format(1, '.', ' ') }}%</strong><br />
+                NDCG@5
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Dernieres courses comparees</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Course</th>
+                    <th>Date</th>
+                    <th>Statut</th>
+                    <th>Comparables</th>
+                    <th>Top 1</th>
+                    <th>Top 3</th>
+                    <th>Erreur rang</th>
+                    <th>NDCG@5</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in recent %}
+                    <tr>
+                        <td>
+                            <a href="{{ path('app_management_race_pronostic', {id: row.race_id}) }}">
+                                #{{ row.race_id }} - {{ row.hippodrome ?: '-' }} R{{ row.meeting_number }} C{{ row.race_number }}
+                            </a>
+                        </td>
+                        <td>{{ row.race_date ? row.race_date|date('Y-m-d') : '-' }}</td>
+                        <td>{{ row.status }}</td>
+                        <td>{{ row.comparable_entries }}/{{ row.total_entries }}</td>
+                        <td>
+                            {% if row.metrics.top1_accuracy is defined %}
+                                {{ (row.metrics.top1_accuracy * 100)|number_format(1, '.', ' ') }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.metrics.top3_hit_rate is defined %}
+                                {{ (row.metrics.top3_hit_rate * 100)|number_format(1, '.', ' ') }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.metrics.mean_rank_error is defined %}
+                                {{ row.metrics.mean_rank_error|number_format(2, '.', ' ') }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.metrics.ndcg_at_5 is defined %}
+                                {{ (row.metrics.ndcg_at_5 * 100)|number_format(1, '.', ' ') }}%
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8">Aucune course snapshottee pour cette periode.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

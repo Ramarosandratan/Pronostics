@@ -7,6 +7,7 @@ use App\Entity\Hippodrome;
 use App\Entity\Participation;
 use App\Entity\Person;
 use App\Entity\Race;
+use App\Service\PronosticComparisonService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -163,7 +164,11 @@ class ManagementCrudController extends AbstractController
     }
 
     #[Route('/participations/creer', name: 'app_management_participation_create', methods: ['POST'])]
-    public function createParticipation(Request $request, EntityManagerInterface $entityManager): Response
+    public function createParticipation(
+        Request $request,
+        EntityManagerInterface $entityManager,
+        PronosticComparisonService $comparisonService,
+    ): Response
     {
         $participation = new Participation();
         $error = $this->hydrateParticipation($participation, $request, $entityManager);
@@ -174,6 +179,7 @@ class ManagementCrudController extends AbstractController
             try {
                 $entityManager->persist($participation);
                 $entityManager->flush();
+                $comparisonService->compareRace($participation->getRace());
                 $this->addFlash('success', 'Participation ajoutee avec succes.');
             } catch (UniqueConstraintViolationException) {
                 $this->addFlash('error', 'Participation deja existante pour cette course et ce cheval.');
@@ -184,7 +190,12 @@ class ManagementCrudController extends AbstractController
     }
 
     #[Route('/participations/{id}/modifier', name: 'app_management_participation_update', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function updateParticipation(Participation $participation, Request $request, EntityManagerInterface $entityManager): Response
+    public function updateParticipation(
+        Participation $participation,
+        Request $request,
+        EntityManagerInterface $entityManager,
+        PronosticComparisonService $comparisonService,
+    ): Response
     {
         $redirectParams = $this->readListContext($request, 20);
         $error = $this->hydrateParticipation($participation, $request, $entityManager);
@@ -196,6 +207,7 @@ class ManagementCrudController extends AbstractController
         } else {
             try {
                 $entityManager->flush();
+                $comparisonService->compareRace($participation->getRace());
                 $this->addFlash('success', 'Participation modifiee avec succes.');
             } catch (UniqueConstraintViolationException) {
                 $this->addFlash('error', 'Participation deja existante pour cette course et ce cheval.');
@@ -208,11 +220,18 @@ class ManagementCrudController extends AbstractController
     }
 
     #[Route('/participations/{id}/supprimer', name: 'app_management_participation_delete', requirements: ['id' => '\\d+'], methods: ['POST'])]
-    public function deleteParticipation(Participation $participation, EntityManagerInterface $entityManager): Response
+    public function deleteParticipation(
+        Participation $participation,
+        EntityManagerInterface $entityManager,
+        PronosticComparisonService $comparisonService,
+    ): Response
     {
+        $race = $participation->getRace();
+
         try {
             $entityManager->remove($participation);
             $entityManager->flush();
+            $comparisonService->compareRace($race);
             $this->addFlash('success', 'Participation supprimee avec succes.');
         } catch (\Throwable) {
             $this->addFlash('error', 'Suppression impossible pour cette participation.');
