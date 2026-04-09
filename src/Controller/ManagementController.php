@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Horse;
+use App\Entity\Hippodrome;
 use App\Entity\Participation;
 use App\Entity\Person;
 use App\Entity\Race;
@@ -19,6 +20,10 @@ use Symfony\Component\Routing\Attribute\Route;
 class ManagementController extends AbstractController
 {
     private const DB_TABLE_MISSING_ON_WRITE = 'Table absente: lancez les migrations Doctrine avant d\'ajouter des donnees.';
+    private const ITEMS_PER_PAGE = 25;
+    private const PARTICIPATIONS_PER_PAGE = 20;
+    /** @var int[] */
+    private const PER_PAGE_OPTIONS = [10, 25, 50];
 
     #[Route('', name: 'app_management_index', methods: ['GET'])]
     public function index(EntityManagerInterface $entityManager): Response
@@ -85,8 +90,24 @@ class ManagementController extends AbstractController
         }
 
         $people = [];
+        $editPerson = null;
+        $perPage = $this->resolvePerPage($request, self::ITEMS_PER_PAGE);
+        $pagination = $this->buildPagination(0, 1, $perPage);
+        $page = max(1, (int) $request->query->get('page', 1));
+        $editId = (int) $request->query->get('edit', 0);
         try {
-            $people = $entityManager->getRepository(Person::class)->findBy([], ['name' => 'ASC']);
+            $totalItems = $entityManager->getRepository(Person::class)->count([]);
+            $pagination = $this->buildPagination($totalItems, $page, $perPage);
+            $people = $entityManager->getRepository(Person::class)->findBy(
+                [],
+                ['name' => 'ASC'],
+                $perPage,
+                $pagination['offset']
+            );
+
+            if ($editId > 0) {
+                $editPerson = $entityManager->getRepository(Person::class)->find($editId);
+            }
         } catch (\Throwable $exception) {
             if (!$this->isMissingTableException($exception)) {
                 throw $exception;
@@ -97,6 +118,10 @@ class ManagementController extends AbstractController
 
         return $this->render('manage/people.html.twig', [
             'people' => $people,
+            'editPerson' => $editPerson,
+            'pagination' => $pagination,
+            'perPage' => $perPage,
+            'perPageOptions' => self::PER_PAGE_OPTIONS,
         ]);
     }
 
@@ -104,40 +129,30 @@ class ManagementController extends AbstractController
     public function horses(Request $request, EntityManagerInterface $entityManager): Response
     {
         if ($request->isMethod('POST')) {
-            $name = trim((string) $request->request->get('name', ''));
-            $sex = strtoupper(trim((string) $request->request->get('sex', '')));
-            $sex = $sex !== '' ? $sex : null;
-
-            if ($name === '') {
-                $this->addFlash('error', 'Le nom du cheval est obligatoire.');
-
-                return $this->redirectToRoute('app_management_horses');
-            }
-
-            $horse = (new Horse())
-                ->setName($name)
-                ->setSex($sex);
-
-            try {
-                $entityManager->persist($horse);
-                $entityManager->flush();
-                $this->addFlash('success', 'Cheval ajoute avec succes.');
-            } catch (UniqueConstraintViolationException) {
-                $this->addFlash('error', 'Ce cheval existe deja.');
-            } catch (\Throwable $exception) {
-                if (!$this->isMissingTableException($exception)) {
-                    throw $exception;
-                }
-
-                $this->addFlash('error', self::DB_TABLE_MISSING_ON_WRITE);
-            }
+            $this->handleHorsePost($request, $entityManager);
 
             return $this->redirectToRoute('app_management_horses');
         }
 
         $horses = [];
+        $editHorse = null;
+        $perPage = $this->resolvePerPage($request, self::ITEMS_PER_PAGE);
+        $editId = (int) $request->query->get('edit', 0);
+        $pagination = $this->buildPagination(0, 1, $perPage);
+        $page = max(1, (int) $request->query->get('page', 1));
         try {
-            $horses = $entityManager->getRepository(Horse::class)->findBy([], ['name' => 'ASC']);
+            $totalItems = $entityManager->getRepository(Horse::class)->count([]);
+            $pagination = $this->buildPagination($totalItems, $page, $perPage);
+            $horses = $entityManager->getRepository(Horse::class)->findBy(
+                [],
+                ['name' => 'ASC'],
+                $perPage,
+                $pagination['offset']
+            );
+
+            if ($editId > 0) {
+                $editHorse = $entityManager->getRepository(Horse::class)->find($editId);
+            }
         } catch (\Throwable $exception) {
             if (!$this->isMissingTableException($exception)) {
                 throw $exception;
@@ -148,7 +163,42 @@ class ManagementController extends AbstractController
 
         return $this->render('manage/horses.html.twig', [
             'horses' => $horses,
+            'editHorse' => $editHorse,
+            'pagination' => $pagination,
+            'perPage' => $perPage,
+            'perPageOptions' => self::PER_PAGE_OPTIONS,
         ]);
+    }
+
+    private function handleHorsePost(Request $request, EntityManagerInterface $entityManager): void
+    {
+        $name = trim((string) $request->request->get('name', ''));
+        $sex = strtoupper(trim((string) $request->request->get('sex', '')));
+        $sex = $sex !== '' ? $sex : null;
+
+        if ($name === '') {
+            $this->addFlash('error', 'Le nom du cheval est obligatoire.');
+
+            return;
+        }
+
+        $horse = (new Horse())
+            ->setName($name)
+            ->setSex($sex);
+
+        try {
+            $entityManager->persist($horse);
+            $entityManager->flush();
+            $this->addFlash('success', 'Cheval ajoute avec succes.');
+        } catch (UniqueConstraintViolationException) {
+            $this->addFlash('error', 'Ce cheval existe deja.');
+        } catch (\Throwable $exception) {
+            if (!$this->isMissingTableException($exception)) {
+                throw $exception;
+            }
+
+            $this->addFlash('error', self::DB_TABLE_MISSING_ON_WRITE);
+        }
     }
 
     #[Route('/courses', name: 'app_management_races', methods: ['GET', 'POST'])]
@@ -159,16 +209,57 @@ class ManagementController extends AbstractController
             return $this->redirectToRoute('app_management_races');
         }
 
+        $hippodromes = [];
+        $races = [];
+        $editRace = null;
+        $perPage = $this->resolvePerPage($request, self::ITEMS_PER_PAGE);
+        $pagination = $this->buildPagination(0, 1, $perPage);
+        $page = max(1, (int) $request->query->get('page', 1));
+        $editId = (int) $request->query->get('edit', 0);
+        try {
+            $hippodromes = $entityManager->getRepository(Hippodrome::class)->findBy([], ['name' => 'ASC']);
+            $totalItems = $entityManager->getRepository(Race::class)->count([]);
+            $pagination = $this->buildPagination($totalItems, $page, $perPage);
+            $races = $entityManager->getRepository(Race::class)->findBy(
+                [],
+                ['id' => 'DESC'],
+                $perPage,
+                $pagination['offset']
+            );
+
+            if ($editId > 0) {
+                $editRace = $entityManager->getRepository(Race::class)->find($editId);
+            }
+        } catch (\Throwable) {
+            // Table might not exist yet
+        }
+
         return $this->render('manage/races.html.twig', [
-            'races' => $this->loadRaces($entityManager),
+            'races' => $races,
+            'hippodromes' => $hippodromes,
+            'editRace' => $editRace,
+            'pagination' => $pagination,
+            'perPage' => $perPage,
+            'perPageOptions' => self::PER_PAGE_OPTIONS,
         ]);
     }
 
     #[Route('/participations', name: 'app_management_participations', methods: ['GET'])]
-    public function participations(EntityManagerInterface $entityManager): Response
+    public function participations(Request $request, EntityManagerInterface $entityManager): Response
     {
         $participations = [];
+        $races = [];
+        $horses = [];
+        $people = [];
+        $editParticipation = null;
+        $perPage = $this->resolvePerPage($request, self::PARTICIPATIONS_PER_PAGE);
+        $pagination = $this->buildPagination(0, 1, $perPage);
+
+        $page = max(1, (int) $request->query->get('page', 1));
+        $editId = (int) $request->query->get('edit', 0);
         try {
+            $totalItems = $entityManager->getRepository(Participation::class)->count([]);
+            $pagination = $this->buildPagination($totalItems, $page, $perPage);
             $participations = $entityManager->createQuery(
                 'SELECT p, r, h, j, t, o
                 FROM App\\Entity\\Participation p
@@ -178,18 +269,47 @@ class ManagementController extends AbstractController
                 LEFT JOIN p.trainer t
                 LEFT JOIN p.owner o
                 ORDER BY p.id DESC'
-            )->setMaxResults(150)->getResult();
+            )
+                ->setFirstResult($pagination['offset'])
+                ->setMaxResults($perPage)
+                ->getResult();
+
+            $races = $entityManager->getRepository(Race::class)->findBy([], ['id' => 'DESC'], 300);
+            $horses = $entityManager->getRepository(Horse::class)->findBy([], ['name' => 'ASC'], 300);
+            $people = $entityManager->getRepository(Person::class)->findBy([], ['name' => 'ASC'], 300);
+
+            if ($editId > 0) {
+                $editParticipation = $entityManager->getRepository(Participation::class)->find($editId);
+            }
         } catch (\Throwable $exception) {
             if (!$this->isMissingTableException($exception)) {
                 throw $exception;
             }
 
-            $this->addFlash('error', 'Tables absentes: lancez les migrations Doctrine pour afficher les participations.');
+            $this->addFlash('error', 'Table absente: lancez les migrations Doctrine pour afficher les participations.');
         }
 
         return $this->render('manage/participations.html.twig', [
             'participations' => $participations,
+            'races' => $races,
+            'horses' => $horses,
+            'people' => $people,
+            'editParticipation' => $editParticipation,
+            'pagination' => $pagination,
+            'perPage' => $perPage,
+            'perPageOptions' => self::PER_PAGE_OPTIONS,
         ]);
+    }
+
+    private function resolvePerPage(Request $request, int $defaultPerPage): int
+    {
+        $requested = (int) $request->query->get('per_page', $defaultPerPage);
+
+        if (in_array($requested, self::PER_PAGE_OPTIONS, true)) {
+            return $requested;
+        }
+
+        return $defaultPerPage;
     }
 
     #[Route('/courses/{id}/pronostic', name: 'app_management_race_pronostic', methods: ['GET'])]
@@ -212,23 +332,26 @@ class ManagementController extends AbstractController
 
         $parsed = \DateTimeImmutable::createFromFormat('Y-m-d', $date);
 
-        return $parsed ?: null;
+        return $parsed !== false ? $parsed : null;
     }
 
     /**
-     * @return array{0: ?Race, 1: string[]}
+     * @return array{0: ?Race, 1: array<int, string>}
      */
-    private function buildRaceFromRequest(Request $request): array
+    /**
+     * @return array{0: ?Race, 1: array<int, string>}
+     */
+    private function buildRaceFromRequest(Request $request, EntityManagerInterface $entityManager): array
     {
         $errors = [];
         $raceDateInput = trim((string) $request->request->get('race_date', ''));
-        $hippodrome = trim((string) $request->request->get('hippodrome', ''));
+        $hippodromeId = (int) $request->request->get('hippodrome_id', 0);
         $meetingNumber = (int) $request->request->get('meeting_number', 0);
         $raceNumber = (int) $request->request->get('race_number', 0);
         $discipline = trim((string) $request->request->get('discipline', ''));
         $sourceDateCode = trim((string) $request->request->get('source_date_code', ''));
 
-        if ($hippodrome === '' || $meetingNumber <= 0 || $raceNumber <= 0) {
+        if ($hippodromeId <= 0 || $meetingNumber <= 0 || $raceNumber <= 0) {
             $errors[] = 'Hippodrome, reunion et numero de course sont obligatoires.';
         }
 
@@ -239,6 +362,11 @@ class ManagementController extends AbstractController
 
         if ($errors !== []) {
             return [null, $errors];
+        }
+
+        $hippodrome = $entityManager->getRepository(Hippodrome::class)->find($hippodromeId);
+        if (!$hippodrome instanceof Hippodrome) {
+            return [null, ['Hippodrome non trouve.']];
         }
 
         $race = (new Race())
@@ -254,7 +382,7 @@ class ManagementController extends AbstractController
 
     private function handleRacePost(Request $request, EntityManagerInterface $entityManager): void
     {
-        [$race, $errors] = $this->buildRaceFromRequest($request);
+        [$race, $errors] = $this->buildRaceFromRequest($request, $entityManager);
 
         foreach ($errors as $error) {
             $this->addFlash('error', $error);
@@ -280,21 +408,25 @@ class ManagementController extends AbstractController
     }
 
     /**
-     * @return Race[]
+     * @return array{page: int, total_pages: int, total_items: int, per_page: int, offset: int, has_prev: bool, has_next: bool, prev_page: int, next_page: int}
      */
-    private function loadRaces(EntityManagerInterface $entityManager): array
+    private function buildPagination(int $totalItems, int $requestedPage, int $perPage): array
     {
-        try {
-            return $entityManager->getRepository(Race::class)->findBy([], ['id' => 'DESC']);
-        } catch (\Throwable $exception) {
-            if (!$this->isMissingTableException($exception)) {
-                throw $exception;
-            }
+        $totalPages = max(1, (int) ceil($totalItems / $perPage));
+        $page = min(max(1, $requestedPage), $totalPages);
+        $offset = ($page - 1) * $perPage;
 
-            $this->addFlash('error', 'Table absente: lancez les migrations Doctrine pour afficher les courses.');
-
-            return [];
-        }
+        return [
+            'page' => $page,
+            'total_pages' => $totalPages,
+            'total_items' => $totalItems,
+            'per_page' => $perPage,
+            'offset' => $offset,
+            'has_prev' => $page > 1,
+            'has_next' => $page < $totalPages,
+            'prev_page' => max(1, $page - 1),
+            'next_page' => min($totalPages, $page + 1),
+        ];
     }
 
     private function isMissingTableException(\Throwable $exception): bool

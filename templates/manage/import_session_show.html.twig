@@ -1,0 +1,53 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Session import #{{ session.id }}{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Session import #{{ session.id }}</h1>
+        <p class="muted">Fichier: {{ session.fileName }} | Date: {{ session.importedAt|date('Y-m-d H:i:s') }}</p>
+        <div class="stats">
+            <div class="stat"><strong>{{ session.status }}</strong><br />Statut</div>
+            <div class="stat"><strong>{{ session.totalRows }}</strong><br />Lignes totales</div>
+            <div class="stat"><strong>{{ session.rowsImported }}</strong><br />Lignes importees</div>
+            <div class="stat"><strong>{{ session.rowsSkipped }}</strong><br />Lignes ignorees</div>
+            <div class="stat"><strong>{{ session.errorCount }}</strong><br />Erreurs</div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Erreurs</h2>
+        {% if errors is empty %}
+            <p class="muted">Aucune erreur enregistree pour cette session.</p>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ligne</th>
+                        <th>Type</th>
+                        <th>Severite</th>
+                        <th>Message</th>
+                        <th>Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for error in errors %}
+                        <tr>
+                            <td>{{ error.rowNumber ?? '-' }}</td>
+                            <td>{{ error.errorType }}</td>
+                            <td>{{ error.severity }}</td>
+                            <td>{{ error.errorMessage }}</td>
+                            <td>
+                                {% if error.sourceSnapshot is not empty %}
+                                    <code>{{ error.sourceSnapshot|json_encode(constant('JSON_UNESCAPED_UNICODE')) }}</code>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+{% endblock %}

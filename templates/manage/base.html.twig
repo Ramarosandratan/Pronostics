@@ -65,6 +65,11 @@
                 display: grid;
                 gap: 10px;
             }
+            .inline-form {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
             input, select, button {
                 padding: 10px;
                 border-radius: 8px;
@@ -126,6 +131,9 @@
                 <a href="{{ path('app_management_horses') }}">Chevaux</a>
                 <a href="{{ path('app_management_races') }}">Courses</a>
                 <a href="{{ path('app_management_participations') }}">Participations</a>
+                <a href="{{ path('app_management_hippodromes') }}">Hippodromes</a>
+                <a href="{{ path('app_management_import_sessions') }}">Imports</a>
+                <a href="{{ path('app_management_normalization') }}">Normalisation</a>
             </nav>
 
             {% for message in app.flashes('success') %}

@@ -6,7 +6,7 @@
     <section class="card">
         <h1>Pronostic course #{{ race.id }}</h1>
         <p class="muted">
-            {{ race.hippodrome }} - R{{ race.meetingNumber }} C{{ race.raceNumber }}
+            {{ race.hippodrome ? race.hippodrome.name : '-' }} - R{{ race.meetingNumber }} C{{ race.raceNumber }}
             {% if race.raceDate %}
                 - {{ race.raceDate|date('Y-m-d') }}
             {% endif %}

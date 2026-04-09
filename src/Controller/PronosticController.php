@@ -19,7 +19,7 @@ class PronosticController extends AbstractController
             'race' => [
                 'id' => $race->getId(),
                 'race_date' => $race->getRaceDate()?->format('Y-m-d'),
-                'hippodrome' => $race->getHippodrome(),
+                'hippodrome' => $race->getHippodrome()?->getName() ?? $race->getHippodromeName(),
                 'meeting_number' => $race->getMeetingNumber(),
                 'race_number' => $race->getRaceNumber(),
                 'discipline' => $race->getDiscipline(),

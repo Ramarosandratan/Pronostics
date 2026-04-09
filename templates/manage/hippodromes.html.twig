@@ -1,13 +1,13 @@
 {% extends 'manage/base.html.twig' %}
 
-{% block title %}Gestion - Personnes{% endblock %}
+{% block title %}Gestion - Hippodromes{% endblock %}
 
 {% block body %}
     <section class="card">
-        <h1>Personnes</h1>
+        <h1>Hippodromes</h1>
         <form method="post">
             <label for="name">Nom</label>
-            <input id="name" name="name" type="text" required maxlength="255" placeholder="Ex: Jean Dupont" />
+            <input id="name" name="name" type="text" required maxlength="255" placeholder="Ex: VINCENNES" />
             <button type="submit">Ajouter</button>
         </form>
     </section>
@@ -15,8 +15,8 @@
     <section class="card">
         <h2>Liste</h2>
         <form method="get" class="inline-form" style="margin-bottom: 12px;">
-            <label for="per_page_people">Par page</label>
-            <select id="per_page_people" name="per_page" onchange="this.form.submit()">
+            <label for="per_page_hippodromes">Par page</label>
+            <select id="per_page_hippodromes" name="per_page" onchange="this.form.submit()">
                 {% for option in perPageOptions %}
                     <option value="{{ option }}" {% if option == perPage %}selected{% endif %}>{{ option }}</option>
                 {% endfor %}
@@ -31,32 +31,32 @@
                 </tr>
             </thead>
             <tbody>
-                {% for person in people %}
+                {% for hippodrome in hippodromes %}
                     <tr>
-                        <td>{{ person.id }}</td>
-                        {% if editPerson and editPerson.id == person.id %}
+                        <td>{{ hippodrome.id }}</td>
+                        {% if editHippodrome and editHippodrome.id == hippodrome.id %}
                             <td>
-                                <input name="name" type="text" value="{{ person.name }}" required maxlength="255" form="person-edit-{{ person.id }}" />
+                                <input name="name" type="text" value="{{ hippodrome.name }}" required maxlength="255" form="hippodrome-edit-{{ hippodrome.id }}" />
                             </td>
                             <td>
-                                <form id="person-edit-{{ person.id }}" method="post" action="{{ path('app_management_person_update', { id: person.id }) }}" class="inline-form" style="margin: 0;">
+                                <form id="hippodrome-edit-{{ hippodrome.id }}" method="post" action="{{ path('app_management_hippodrome_update', { id: hippodrome.id }) }}" class="inline-form" style="margin: 0;">
                                     <input type="hidden" name="page" value="{{ pagination.page }}" />
                                     <input type="hidden" name="per_page" value="{{ perPage }}" />
                                     <button type="submit">Enregistrer</button>
-                                    <a href="{{ path('app_management_people', { page: pagination.page, per_page: perPage }) }}">Annuler</a>
+                                    <a href="{{ path('app_management_hippodromes', { page: pagination.page, per_page: perPage }) }}">Annuler</a>
                                 </form>
                             </td>
                         {% else %}
-                            <td>{{ person.name }}</td>
+                            <td>{{ hippodrome.name }}</td>
                             <td>
                                 <div class="inline-form">
-                                    <form method="get" action="{{ path('app_management_people') }}" class="inline-form" style="margin: 0;">
-                                        <input type="hidden" name="edit" value="{{ person.id }}" />
+                                    <form method="get" action="{{ path('app_management_hippodromes') }}" class="inline-form" style="margin: 0;">
+                                        <input type="hidden" name="edit" value="{{ hippodrome.id }}" />
                                         <input type="hidden" name="page" value="{{ pagination.page }}" />
                                         <input type="hidden" name="per_page" value="{{ perPage }}" />
                                         <button type="submit">Modifier</button>
                                     </form>
-                                    <form method="post" action="{{ path('app_management_person_delete', { id: person.id }) }}" class="inline-form" style="margin: 0;">
+                                    <form method="post" action="{{ path('app_management_hippodrome_delete', { id: hippodrome.id }) }}" class="inline-form" style="margin: 0;">
                                         <button type="submit">Supprimer</button>
                                     </form>
                                 </div>
@@ -65,7 +65,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="3">Aucune personne enregistree.</td>
+                        <td colspan="3">Aucun hippodrome enregistre.</td>
                     </tr>
                 {% endfor %}
             </tbody>
@@ -74,13 +74,13 @@
             <div class="inline-form" style="margin-top: 12px; justify-content: space-between;">
                 <div>
                     {% if pagination.has_prev %}
-                        <a href="{{ path('app_management_people', { page: pagination.prev_page, per_page: perPage }) }}">Precedent</a>
+                        <a href="{{ path('app_management_hippodromes', { page: pagination.prev_page, per_page: perPage }) }}">Precedent</a>
                     {% endif %}
                 </div>
                 <div class="muted">Page {{ pagination.page }} / {{ pagination.total_pages }} - {{ pagination.total_items }} elements</div>
                 <div>
                     {% if pagination.has_next %}
-                        <a href="{{ path('app_management_people', { page: pagination.next_page, per_page: perPage }) }}">Suivant</a>
+                        <a href="{{ path('app_management_hippodromes', { page: pagination.next_page, per_page: perPage }) }}">Suivant</a>
                     {% endif %}
                 </div>
             </div>
