@@ -1,0 +1,47 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Sessions d'import{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Sessions d'import</h1>
+        <p class="muted">Historique des imports executes via la commande app:import:races.</p>
+    </section>
+
+    <section class="card">
+        {% if sessions is empty %}
+            <p class="muted">Aucune session d'import disponible.</p>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Fichier</th>
+                        <th>Date</th>
+                        <th>Statut</th>
+                        <th>Lignes</th>
+                        <th>Importees</th>
+                        <th>Ignorees</th>
+                        <th>Erreurs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for session in sessions %}
+                        <tr>
+                            <td>
+                                <a href="{{ path('app_management_import_session_show', { id: session.id }) }}">#{{ session.id }}</a>
+                            </td>
+                            <td>{{ session.fileName }}</td>
+                            <td>{{ session.importedAt|date('Y-m-d H:i:s') }}</td>
+                            <td>{{ session.status }}</td>
+                            <td>{{ session.totalRows }}</td>
+                            <td>{{ session.rowsImported }}</td>
+                            <td>{{ session.rowsSkipped }}</td>
+                            <td>{{ session.errorCount }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+{% endblock %}

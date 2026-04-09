@@ -5,11 +5,97 @@
 {% block body %}
     <section class="card">
         <h1>Participations</h1>
-        <p class="muted">Affichage des 150 dernieres participations.</p>
+        <p class="muted">Affichage pagine des participations.</p>
+    </section>
+
+    <section class="card">
+        <h2>Ajouter une participation</h2>
+        <form method="post" action="{{ path('app_management_participation_create') }}">
+            <label for="race_id">Course</label>
+            <select id="race_id" name="race_id" required>
+                <option value="">Choisir...</option>
+                {% for race in races %}
+                    <option value="{{ race.id }}">
+                        #{{ race.id }} - {{ race.raceDate ? race.raceDate|date('Y-m-d') : 'N/A' }} {{ race.hippodrome ? race.hippodrome.name : '-' }} R{{ race.meetingNumber }}C{{ race.raceNumber }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <label for="horse_id">Cheval</label>
+            <select id="horse_id" name="horse_id" required>
+                <option value="">Choisir...</option>
+                {% for horse in horses %}
+                    <option value="{{ horse.id }}">#{{ horse.id }} - {{ horse.name }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="jockey_id">Jockey</label>
+            <select id="jockey_id" name="jockey_id">
+                <option value="">-</option>
+                {% for person in people %}
+                    <option value="{{ person.id }}">#{{ person.id }} - {{ person.name }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="trainer_id">Entraineur</label>
+            <select id="trainer_id" name="trainer_id">
+                <option value="">-</option>
+                {% for person in people %}
+                    <option value="{{ person.id }}">#{{ person.id }} - {{ person.name }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="owner_id">Proprietaire</label>
+            <select id="owner_id" name="owner_id">
+                <option value="">-</option>
+                {% for person in people %}
+                    <option value="{{ person.id }}">#{{ person.id }} - {{ person.name }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="saddle_number">N° selle</label>
+            <input id="saddle_number" name="saddle_number" type="number" min="0" />
+
+            <label for="finishing_position">Place</label>
+            <input id="finishing_position" name="finishing_position" type="number" min="0" />
+
+            <label for="age_at_race">Age</label>
+            <input id="age_at_race" name="age_at_race" type="number" min="0" />
+
+            <label for="distance_or_weight">Distance/Poids</label>
+            <input id="distance_or_weight" name="distance_or_weight" type="text" />
+
+            <label for="shoeing_or_draw">Ferrure/Corde</label>
+            <input id="shoeing_or_draw" name="shoeing_or_draw" type="text" maxlength="50" />
+
+            <label for="performance_indicator">Indicateur perf.</label>
+            <input id="performance_indicator" name="performance_indicator" type="text" maxlength="50" />
+
+            <label for="odds">Cote</label>
+            <input id="odds" name="odds" type="text" />
+
+            <label for="music">Musique</label>
+            <input id="music" name="music" type="text" maxlength="255" />
+
+            <label for="career_earnings">Gains carriere</label>
+            <input id="career_earnings" name="career_earnings" type="text" />
+
+            <button type="submit">Ajouter</button>
+        </form>
     </section>
 
     <section class="card">
         <table>
+            <caption style="caption-side: top; text-align: left; margin-bottom: 12px;">
+                <form method="get" class="inline-form">
+                    <label for="per_page_participations">Par page</label>
+                    <select id="per_page_participations" name="per_page" onchange="this.form.submit()">
+                        {% for option in perPageOptions %}
+                            <option value="{{ option }}" {% if option == perPage %}selected{% endif %}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </caption>
             <thead>
                 <tr>
                     <th>ID</th>
@@ -21,31 +107,120 @@
                     <th>N° selle</th>
                     <th>Place</th>
                     <th>Cote</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for p in participations %}
                     <tr>
                         <td>{{ p.id }}</td>
-                        <td>
-                            {{ p.race.raceDate ? p.race.raceDate|date('Y-m-d') : 'N/A' }}
-                            {{ p.race.hippodrome }}
-                            R{{ p.race.meetingNumber }}C{{ p.race.raceNumber }}
-                        </td>
-                        <td>{{ p.horse.name }}</td>
-                        <td>{{ p.jockey ? p.jockey.name : '-' }}</td>
-                        <td>{{ p.trainer ? p.trainer.name : '-' }}</td>
-                        <td>{{ p.owner ? p.owner.name : '-' }}</td>
-                        <td>{{ p.saddleNumber ?: '-' }}</td>
-                        <td>{{ p.finishingPosition ?: '-' }}</td>
-                        <td>{{ p.odds ?: '-' }}</td>
+                        {% if editParticipation and editParticipation.id == p.id %}
+                            <td>
+                                <select name="race_id" required form="participation-edit-{{ p.id }}" style="max-width: 280px;">
+                                    {% for race in races %}
+                                        <option value="{{ race.id }}" {% if race.id == p.race.id %}selected{% endif %}>
+                                            #{{ race.id }} {{ race.hippodrome ? race.hippodrome.name : '-' }} R{{ race.meetingNumber }}C{{ race.raceNumber }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <select name="horse_id" required form="participation-edit-{{ p.id }}">
+                                    {% for horse in horses %}
+                                        <option value="{{ horse.id }}" {% if horse.id == p.horse.id %}selected{% endif %}>{{ horse.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <select name="jockey_id" form="participation-edit-{{ p.id }}">
+                                    <option value="">-</option>
+                                    {% for person in people %}
+                                        <option value="{{ person.id }}" {% if p.jockey and person.id == p.jockey.id %}selected{% endif %}>{{ person.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <select name="trainer_id" form="participation-edit-{{ p.id }}">
+                                    <option value="">-</option>
+                                    {% for person in people %}
+                                        <option value="{{ person.id }}" {% if p.trainer and person.id == p.trainer.id %}selected{% endif %}>{{ person.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <select name="owner_id" form="participation-edit-{{ p.id }}">
+                                    <option value="">-</option>
+                                    {% for person in people %}
+                                        <option value="{{ person.id }}" {% if p.owner and person.id == p.owner.id %}selected{% endif %}>{{ person.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td><input name="saddle_number" type="number" min="0" value="{{ p.saddleNumber ?: '' }}" style="width: 90px;" form="participation-edit-{{ p.id }}" /></td>
+                            <td><input name="finishing_position" type="number" min="0" value="{{ p.finishingPosition ?: '' }}" style="width: 90px;" form="participation-edit-{{ p.id }}" /></td>
+                            <td><input name="odds" type="text" value="{{ p.odds ?: '' }}" style="width: 90px;" form="participation-edit-{{ p.id }}" /></td>
+                            <td>
+                                <form id="participation-edit-{{ p.id }}" method="post" action="{{ path('app_management_participation_update', { id: p.id }) }}" class="inline-form" style="margin: 0;">
+                                    <input type="hidden" name="age_at_race" value="{{ p.ageAtRace ?: '' }}" />
+                                    <input type="hidden" name="distance_or_weight" value="{{ p.distanceOrWeight ?: '' }}" />
+                                    <input type="hidden" name="shoeing_or_draw" value="{{ p.shoeingOrDraw ?: '' }}" />
+                                    <input type="hidden" name="performance_indicator" value="{{ p.performanceIndicator ?: '' }}" />
+                                    <input type="hidden" name="music" value="{{ p.music ?: '' }}" />
+                                    <input type="hidden" name="career_earnings" value="{{ p.careerEarnings ?: '' }}" />
+                                    <input type="hidden" name="page" value="{{ pagination.page }}" />
+                                    <input type="hidden" name="per_page" value="{{ perPage }}" />
+                                    <button type="submit">Enregistrer</button>
+                                    <a href="{{ path('app_management_participations', { page: pagination.page, per_page: perPage }) }}">Annuler</a>
+                                </form>
+                            </td>
+                        {% else %}
+                            <td>
+                                {{ p.race.raceDate ? p.race.raceDate|date('Y-m-d') : 'N/A' }}
+                                {{ p.race.hippodrome ? p.race.hippodrome.name : '-' }}
+                                R{{ p.race.meetingNumber }}C{{ p.race.raceNumber }}
+                            </td>
+                            <td>{{ p.horse.name }}</td>
+                            <td>{{ p.jockey ? p.jockey.name : '-' }}</td>
+                            <td>{{ p.trainer ? p.trainer.name : '-' }}</td>
+                            <td>{{ p.owner ? p.owner.name : '-' }}</td>
+                            <td>{{ p.saddleNumber ?: '-' }}</td>
+                            <td>{{ p.finishingPosition ?: '-' }}</td>
+                            <td>{{ p.odds ?: '-' }}</td>
+                            <td>
+                                <div class="inline-form">
+                                    <form method="get" action="{{ path('app_management_participations') }}" class="inline-form" style="margin: 0;">
+                                        <input type="hidden" name="edit" value="{{ p.id }}" />
+                                        <input type="hidden" name="page" value="{{ pagination.page }}" />
+                                        <input type="hidden" name="per_page" value="{{ perPage }}" />
+                                        <button type="submit">Modifier</button>
+                                    </form>
+                                    <form method="post" action="{{ path('app_management_participation_delete', { id: p.id }) }}" class="inline-form" style="margin: 0;">
+                                        <button type="submit">Supprimer</button>
+                                    </form>
+                                </div>
+                            </td>
+                        {% endif %}
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="9">Aucune participation enregistree.</td>
+                        <td colspan="10">Aucune participation enregistree.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% if pagination.total_pages > 1 %}
+            <div class="inline-form" style="margin-top: 12px; justify-content: space-between;">
+                <div>
+                    {% if pagination.has_prev %}
+                        <a href="{{ path('app_management_participations', { page: pagination.prev_page, per_page: perPage }) }}">Precedent</a>
+                    {% endif %}
+                </div>
+                <div class="muted">Page {{ pagination.page }} / {{ pagination.total_pages }} - {{ pagination.total_items }} elements</div>
+                <div>
+                    {% if pagination.has_next %}
+                        <a href="{{ path('app_management_participations', { page: pagination.next_page, per_page: perPage }) }}">Suivant</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
     </section>
 {% endblock %}

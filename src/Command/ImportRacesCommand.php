@@ -55,11 +55,16 @@ class ImportRacesCommand extends Command
                 ['Lignes total', (string) $stats['rows_total']],
                 ['Lignes importees', (string) $stats['rows_imported']],
                 ['Lignes ignorees', (string) $stats['rows_skipped']],
+                ['Erreurs import', (string) $stats['error_count']],
                 ['Courses creees', (string) $stats['races_created']],
                 ['Chevaux crees', (string) $stats['horses_created']],
                 ['Personnes creees', (string) $stats['persons_created']],
             ]
         );
+
+        if ((int) $stats['import_session_id'] > 0) {
+            $io->text(sprintf('Session import: #%d', (int) $stats['import_session_id']));
+        }
 
         return Command::SUCCESS;
     }

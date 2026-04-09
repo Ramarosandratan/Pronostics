@@ -3,9 +3,15 @@
 namespace App\Service;
 
 use App\Entity\Horse;
+use App\Entity\HorseAlias;
+use App\Entity\Hippodrome;
+use App\Entity\ImportError;
+use App\Entity\ImportSession;
 use App\Entity\Participation;
 use App\Entity\Person;
+use App\Entity\PersonAlias;
 use App\Entity\Race;
+use App\Exception\ImportException;
 use Doctrine\ORM\EntityManagerInterface;
 use Shuchkin\SimpleXLSX;
 
@@ -20,18 +26,7 @@ class ExcelImportService
      */
     public function import(string $filePath, bool $dryRun = false): array
     {
-        if (!is_file($filePath)) {
-            throw new \RuntimeException(sprintf('Fichier introuvable: %s', $filePath));
-        }
-
-        $xlsx = SimpleXLSX::parse($filePath);
-
-        if ($xlsx === false) {
-            throw new \RuntimeException(sprintf('Impossible de parser le fichier XLSX: %s', SimpleXLSX::parseError()));
-        }
-
-        $rowsRaw = $xlsx->rows();
-        $rows = is_array($rowsRaw) ? $rowsRaw : iterator_to_array($rowsRaw, false);
+        $rows = $this->loadRows($filePath);
         if (count($rows) < 2) {
             return [
                 'rows_total' => 0,
@@ -40,25 +35,12 @@ class ExcelImportService
                 'races_created' => 0,
                 'horses_created' => 0,
                 'persons_created' => 0,
+                'error_count' => 0,
+                'import_session_id' => 0,
             ];
         }
 
-        $header = array_map(static fn ($value): string => (string) $value, $rows[0]);
-        $indexes = $this->resolveHeaderIndexes($header);
-
-        if (!isset($indexes['hippodrome']) || !isset($indexes['horse_name'])) {
-            $indexes = array_merge($indexes, $this->resolveFallbackIndexesByPosition($rows));
-        }
-
-        $required = ['hippodrome', 'horse_name'];
-        foreach ($required as $field) {
-            if (!isset($indexes[$field])) {
-                throw new \RuntimeException(sprintf('Colonne requise non detectee: %s', $field));
-            }
-        }
-
-        $connection = $this->entityManager->getConnection();
-        $connection->beginTransaction();
+        $indexes = $this->resolveAndValidateIndexes($rows);
 
         $stats = [
             'rows_total' => count($rows) - 1,
@@ -67,149 +49,42 @@ class ExcelImportService
             'races_created' => 0,
             'horses_created' => 0,
             'persons_created' => 0,
+            'error_count' => 0,
+            'import_session_id' => 0,
+        ];
+        $importSession = null;
+        if (!$dryRun) {
+            $importSession = (new ImportSession())
+                ->setFileName(basename($filePath))
+                ->setStatus('running')
+                ->setTotalRows($stats['rows_total']);
+
+            $this->entityManager->persist($importSession);
+        }
+        $context = [
+            'raceCache' => [],
+            'horseCache' => [],
+            'personCache' => [],
+            'participationSeen' => [],
         ];
 
-        $raceCache = [];
-        $horseCache = [];
-        $personCache = [];
-        $participationSeen = [];
+        $connection = $this->entityManager->getConnection();
+        $connection->beginTransaction();
         $line = 0;
 
         try {
-            foreach (array_slice($rows, 1) as $lineNumber => $row) {
-                $line = $lineNumber + 2;
+            $line = $this->processRows($rows, $indexes, $importSession, $stats, $context);
 
-                $horseName = $this->getCell($row, $indexes, 'horse_name');
-                $hippodrome = $this->getCell($row, $indexes, 'hippodrome');
-                if ($horseName === null || $hippodrome === null) {
-                    ++$stats['rows_skipped'];
-                    continue;
-                }
-
-                $meetingNumber = $this->toInt($this->getCell($row, $indexes, 'meeting_number'));
-                $raceNumber = $this->toInt($this->getCell($row, $indexes, 'race_number'));
-
-                if ($meetingNumber === null || $raceNumber === null) {
-                    [$meetingNumber, $raceNumber] = $this->extractMeetingRaceFromCode(
-                        $this->getCell($row, $indexes, 'meeting_race_code')
-                    );
-                }
-
-                if ($meetingNumber === null || $raceNumber === null) {
-                    ++$stats['rows_skipped'];
-                    continue;
-                }
-
-                $sourceDateCode = $this->getCell($row, $indexes, 'source_date_code');
-                $raceDate = $this->parseDate($this->getCell($row, $indexes, 'race_date'));
-
-                $raceIdentity = sprintf(
-                    '%s|%s|%d|%d',
-                    $sourceDateCode ?? '-',
-                    strtoupper($hippodrome),
-                    $meetingNumber,
-                    $raceNumber
-                );
-
-                if (!isset($raceCache[$raceIdentity])) {
-                    $race = $this->entityManager->getRepository(Race::class)->findOneBy([
-                        'sourceDateCode' => $sourceDateCode,
-                        'hippodrome' => strtoupper($hippodrome),
-                        'meetingNumber' => $meetingNumber,
-                        'raceNumber' => $raceNumber,
-                    ]);
-
-                    if (!$race instanceof Race) {
-                        $race = (new Race())
-                            ->setHippodrome($hippodrome)
-                            ->setMeetingNumber($meetingNumber)
-                            ->setRaceNumber($raceNumber)
-                            ->setSourceDateCode($sourceDateCode)
-                            ->setRaceDate($raceDate)
-                            ->setDiscipline($this->getCell($row, $indexes, 'discipline'));
-
-                        $this->entityManager->persist($race);
-                        ++$stats['races_created'];
-                    }
-
-                    $raceCache[$raceIdentity] = $race;
-                }
-
-                $sexAge = $this->parseSexAge($this->getCell($row, $indexes, 'sex_age'));
-                $horseKey = strtoupper($horseName);
-
-                if (!isset($horseCache[$horseKey])) {
-                    $horse = $this->entityManager->getRepository(Horse::class)->findOneBy(['name' => $horseName]);
-
-                    if (!$horse instanceof Horse) {
-                        $horse = (new Horse())
-                            ->setName($horseName)
-                            ->setSex($sexAge['sex']);
-
-                        $this->entityManager->persist($horse);
-                        ++$stats['horses_created'];
-                    } elseif ($horse->getSex() === null && $sexAge['sex'] !== null) {
-                        $horse->setSex($sexAge['sex']);
-                    }
-
-                    $horseCache[$horseKey] = $horse;
-                }
-
-                $race = $raceCache[$raceIdentity];
-                $horse = $horseCache[$horseKey];
-
-                $participationKey = $raceIdentity . '|' . $horseKey;
-                if (isset($participationSeen[$participationKey])) {
-                    ++$stats['rows_skipped'];
-                    continue;
-                }
-
-                $existingParticipation = $this->entityManager->getRepository(Participation::class)->findOneBy([
-                    'race' => $race,
-                    'horse' => $horse,
-                ]);
-
-                if ($existingParticipation instanceof Participation) {
-                    $participationSeen[$participationKey] = true;
-                    ++$stats['rows_skipped'];
-
-                    continue;
-                }
-
-                $jockey = $this->findOrCreatePerson($this->getCell($row, $indexes, 'jockey'), $personCache, $stats);
-                $trainer = $this->findOrCreatePerson($this->getCell($row, $indexes, 'trainer'), $personCache, $stats);
-                $owner = $this->findOrCreatePerson($this->getCell($row, $indexes, 'owner'), $personCache, $stats);
-
-                $participation = (new Participation())
-                    ->setRace($race)
-                    ->setHorse($horse)
-                    ->setJockey($jockey)
-                    ->setTrainer($trainer)
-                    ->setOwner($owner)
-                    ->setSaddleNumber($this->toInt($this->getCell($row, $indexes, 'saddle_number')))
-                    ->setFinishingPosition($this->toInt($this->getCell($row, $indexes, 'finishing_position')))
-                    ->setAgeAtRace($sexAge['age'])
-                    ->setDistanceOrWeight($this->toFloat($this->getCell($row, $indexes, 'distance_or_weight')))
-                    ->setShoeingOrDraw($this->getCell($row, $indexes, 'shoeing_or_draw'))
-                    ->setPerformanceIndicator($this->getCell($row, $indexes, 'performance_indicator'))
-                    ->setOdds($this->toFloat($this->getCell($row, $indexes, 'odds')))
-                    ->setMusic($this->getCell($row, $indexes, 'music'))
-                    ->setCareerEarnings($this->toBigInt($this->getCell($row, $indexes, 'career_earnings')));
-
-                $this->entityManager->persist($participation);
-                $participationSeen[$participationKey] = true;
-                ++$stats['rows_imported'];
-
-                if ($line % 200 === 0) {
-                    $this->entityManager->flush();
-                    $this->entityManager->clear();
-                    $raceCache = [];
-                    $horseCache = [];
-                    $personCache = [];
-                }
+            if ($importSession instanceof ImportSession) {
+                $importSession
+                    ->setRowsImported($stats['rows_imported'])
+                    ->setRowsSkipped($stats['rows_skipped'])
+                    ->setErrorCount($stats['error_count'])
+                    ->setStatus($stats['error_count'] > 0 ? 'failed_with_errors' : 'completed');
             }
 
             $this->entityManager->flush();
+            $stats['import_session_id'] = (int) ($importSession?->getId() ?? 0);
 
             if ($dryRun) {
                 $connection->rollBack();
@@ -225,12 +100,361 @@ class ExcelImportService
                 $connection->rollBack();
             }
 
-            throw new \RuntimeException(
+            if ($importSession instanceof ImportSession) {
+                try {
+                    $importSession
+                        ->setRowsImported($stats['rows_imported'])
+                        ->setRowsSkipped($stats['rows_skipped'])
+                        ->setErrorCount($stats['error_count'])
+                        ->setStatus('failed');
+
+                    $this->entityManager->persist($importSession);
+                    $this->entityManager->flush();
+                } catch (\Throwable) {
+                    // Ignore secondary failure to preserve original exception context.
+                }
+            }
+
+            throw new ImportException(
                 sprintf('Erreur d\'import a la ligne %d: %s', $line ?? 0, $exception->getMessage()),
                 0,
                 $exception
             );
         }
+    }
+
+    /**
+     * @return array<int, array<int, mixed>>
+     */
+    private function loadRows(string $filePath): array
+    {
+        if (!is_file($filePath)) {
+            throw new ImportException(sprintf('Fichier introuvable: %s', $filePath));
+        }
+
+        $xlsx = SimpleXLSX::parse($filePath);
+        if ($xlsx === false) {
+            throw new ImportException(sprintf('Impossible de parser le fichier XLSX: %s', SimpleXLSX::parseError()));
+        }
+
+        $rowsRaw = $xlsx->rows();
+
+        return is_array($rowsRaw) ? $rowsRaw : iterator_to_array($rowsRaw, false);
+    }
+
+    /**
+     * @param array<int, array<int, mixed>> $rows
+     *
+     * @return array<string, int>
+     */
+    private function resolveAndValidateIndexes(array $rows): array
+    {
+        $header = array_map(static fn ($value): string => (string) $value, $rows[0]);
+        $indexes = $this->resolveHeaderIndexes($header);
+
+        if (!isset($indexes['hippodrome']) || !isset($indexes['horse_name'])) {
+            $indexes = array_merge($indexes, $this->resolveFallbackIndexesByPosition($rows));
+        }
+
+        foreach (['hippodrome', 'horse_name'] as $field) {
+            if (!isset($indexes[$field])) {
+                throw new ImportException(sprintf('Colonne requise non detectee: %s', $field));
+            }
+        }
+
+        return $indexes;
+    }
+
+    /**
+     * @param array<int, array<int, mixed>> $rows
+     * @param array<string, int> $indexes
+     * @param array<string, int> $stats
+     * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>} $context
+     */
+    private function processRows(array $rows, array $indexes, ?ImportSession $session, array &$stats, array &$context): int
+    {
+        $line = 0;
+
+        foreach (array_slice($rows, 1) as $lineNumber => $row) {
+            $line = $lineNumber + 2;
+
+            try {
+                $this->processRow($row, $line, $indexes, $session, $stats, $context);
+            } catch (\Throwable $rowException) {
+                ++$stats['rows_skipped'];
+                $this->recordImportError(
+                    $session,
+                    $stats,
+                    $line,
+                    'row_processing_error',
+                    $rowException->getMessage(),
+                    $row
+                );
+            }
+        }
+
+        return $line;
+    }
+
+    /**
+     * @param array<int, mixed> $row
+     * @param array<string, int> $indexes
+     * @param array<string, int> $stats
+     * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>} $context
+     */
+    private function processRow(
+        array $row,
+        int $line,
+        array $indexes,
+        ?ImportSession $session,
+        array &$stats,
+        array &$context
+    ): void {
+        $horseName = $this->getCell($row, $indexes, 'horse_name');
+        $hippodrome = $this->getCell($row, $indexes, 'hippodrome');
+        if ($horseName === null || $hippodrome === null) {
+            $this->skipRow(
+                $session,
+                $stats,
+                $line,
+                'missing_field',
+                'Ligne ignoree: hippodrome ou nom du cheval manquant.',
+                $row
+            );
+
+            return;
+        }
+
+        $meetingNumber = $this->toInt($this->getCell($row, $indexes, 'meeting_number'));
+        $raceNumber = $this->toInt($this->getCell($row, $indexes, 'race_number'));
+        if ($meetingNumber === null || $raceNumber === null) {
+            [$meetingNumber, $raceNumber] = ImportValueParser::extractMeetingRaceFromCode(
+                $this->getCell($row, $indexes, 'meeting_race_code')
+            );
+        }
+
+        if ($meetingNumber === null || $raceNumber === null) {
+            $this->skipRow(
+                $session,
+                $stats,
+                $line,
+                'invalid_format',
+                'Ligne ignoree: numero reunion/course invalide.',
+                $row
+            );
+
+            return;
+        }
+
+        $sourceDateCode = $this->getCell($row, $indexes, 'source_date_code');
+        $raceDate = $this->parseDate($this->getCell($row, $indexes, 'race_date'));
+        $raceInfo = [
+            'hippodrome' => $hippodrome,
+            'meetingNumber' => $meetingNumber,
+            'raceNumber' => $raceNumber,
+            'sourceDateCode' => $sourceDateCode,
+            'raceDate' => $raceDate,
+        ];
+        [$raceIdentity, $race] = $this->resolveRace(
+            $row,
+            $indexes,
+            $context,
+            $stats,
+            $raceInfo
+        );
+
+        $sexAge = $this->parseSexAge($this->getCell($row, $indexes, 'sex_age'));
+        [$horseKey, $horse] = $this->resolveHorse($context, $stats, $horseName, $sexAge['sex']);
+        $participationKey = $raceIdentity . '|' . $horseKey;
+        $canCreateParticipation = true;
+
+        if (isset($context['participationSeen'][$participationKey])) {
+            $this->skipRow(
+                $session,
+                $stats,
+                $line,
+                'duplicate_warning',
+                'Ligne ignoree: participation dupliquee dans le fichier.',
+                $row,
+                'warning'
+            );
+            $canCreateParticipation = false;
+        } else {
+            $existingParticipation = $this->entityManager->getRepository(Participation::class)->findOneBy([
+                'race' => $race,
+                'horse' => $horse,
+            ]);
+
+            if ($existingParticipation instanceof Participation) {
+                $context['participationSeen'][$participationKey] = true;
+                $this->skipRow(
+                    $session,
+                    $stats,
+                    $line,
+                    'duplicate_warning',
+                    'Ligne ignoree: participation deja en base.',
+                    $row,
+                    'warning'
+                );
+                $canCreateParticipation = false;
+            }
+        }
+
+        if ($canCreateParticipation) {
+            $jockey = $this->findOrCreatePerson($this->getCell($row, $indexes, 'jockey'), $context['personCache'], $stats);
+            $trainer = $this->findOrCreatePerson($this->getCell($row, $indexes, 'trainer'), $context['personCache'], $stats);
+            $owner = $this->findOrCreatePerson($this->getCell($row, $indexes, 'owner'), $context['personCache'], $stats);
+
+            $participation = (new Participation())
+                ->setRace($race)
+                ->setHorse($horse)
+                ->setJockey($jockey)
+                ->setTrainer($trainer)
+                ->setOwner($owner)
+                ->setSaddleNumber($this->toInt($this->getCell($row, $indexes, 'saddle_number')))
+                ->setFinishingPosition($this->toInt($this->getCell($row, $indexes, 'finishing_position')))
+                ->setAgeAtRace($sexAge['age'])
+                ->setDistanceOrWeight($this->toFloat($this->getCell($row, $indexes, 'distance_or_weight')))
+                ->setShoeingOrDraw($this->getCell($row, $indexes, 'shoeing_or_draw'))
+                ->setPerformanceIndicator($this->getCell($row, $indexes, 'performance_indicator'))
+                ->setOdds($this->toFloat($this->getCell($row, $indexes, 'odds')))
+                ->setMusic($this->getCell($row, $indexes, 'music'))
+                ->setCareerEarnings($this->toBigInt($this->getCell($row, $indexes, 'career_earnings')));
+
+            $this->entityManager->persist($participation);
+            $context['participationSeen'][$participationKey] = true;
+            ++$stats['rows_imported'];
+        }
+    }
+
+    /**
+     * @param array<int, mixed> $row
+     * @param array<string, int> $indexes
+     * @param array<string, int> $stats
+     * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>} $context
+     * @param array{hippodrome: string, meetingNumber: int, raceNumber: int, sourceDateCode: ?string, raceDate: ?\DateTimeImmutable} $raceInfo
+     *
+     * @return array{0: string, 1: Race}
+     */
+    private function resolveRace(
+        array $row,
+        array $indexes,
+        array &$context,
+        array &$stats,
+        array $raceInfo
+    ): array {
+        $hippodromeUppercase = strtoupper($raceInfo['hippodrome']);
+        
+        $raceIdentity = sprintf(
+            '%s|%s|%d|%d',
+            $raceInfo['sourceDateCode'] ?? '-',
+            $hippodromeUppercase,
+            $raceInfo['meetingNumber'],
+            $raceInfo['raceNumber']
+        );
+
+        if (!isset($context['raceCache'][$raceIdentity])) {
+            $horseRepository = $this->entityManager->getRepository(Hippodrome::class);
+            $hippodrome = $horseRepository->findOneBy(['name' => $hippodromeUppercase]);
+
+            if (!$hippodrome instanceof Hippodrome) {
+                $hippodrome = (new Hippodrome())->setName($hippodromeUppercase);
+                $this->entityManager->persist($hippodrome);
+            }
+
+            $race = $this->entityManager->getRepository(Race::class)->findOneBy([
+                'sourceDateCode' => $raceInfo['sourceDateCode'],
+                'hippodrome' => $hippodrome,
+                'meetingNumber' => $raceInfo['meetingNumber'],
+                'raceNumber' => $raceInfo['raceNumber'],
+            ]);
+
+            if (!$race instanceof Race) {
+                $race = (new Race())
+                    ->setHippodrome($hippodrome)
+                    ->setMeetingNumber($raceInfo['meetingNumber'])
+                    ->setRaceNumber($raceInfo['raceNumber'])
+                    ->setSourceDateCode($raceInfo['sourceDateCode'])
+                    ->setRaceDate($raceInfo['raceDate'])
+                    ->setDiscipline($this->getCell($row, $indexes, 'discipline'));
+
+                $this->entityManager->persist($race);
+                ++$stats['races_created'];
+            }
+
+            $context['raceCache'][$raceIdentity] = $race;
+        }
+
+        return [$raceIdentity, $context['raceCache'][$raceIdentity]];
+    }
+
+    /**
+     * @param array<string, int> $stats
+     * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>} $context
+     *
+     * @return array{0: string, 1: Horse}
+     */
+    private function resolveHorse(array &$context, array &$stats, string $horseName, ?string $sex): array
+    {
+        $horseKey = strtoupper($horseName);
+        $canonicalHorseName = strtoupper($this->normalize($horseName));
+
+        if (!isset($context['horseCache'][$horseKey])) {
+            $horse = $this->entityManager->getRepository(Horse::class)->findOneBy(['name' => $horseName]);
+
+            if (!$horse instanceof Horse) {
+                $alias = $this->entityManager->getRepository(HorseAlias::class)->findOneBy([
+                    'canonicalForm' => $canonicalHorseName,
+                ]);
+                if ($alias instanceof HorseAlias) {
+                    $horse = $alias->getHorse();
+                }
+            }
+
+            if (!$horse instanceof Horse) {
+                $horse = (new Horse())
+                    ->setName($horseName)
+                    ->setSex($sex);
+
+                $this->entityManager->persist($horse);
+                ++$stats['horses_created'];
+            } elseif ($horse->getSex() === null && $sex !== null) {
+                $horse->setSex($sex);
+            }
+
+            $existingAlias = $this->entityManager->getRepository(HorseAlias::class)->findOneBy([
+                'canonicalForm' => $canonicalHorseName,
+            ]);
+            if (!$existingAlias instanceof HorseAlias) {
+                $this->entityManager->persist(
+                    (new HorseAlias())
+                        ->setHorse($horse)
+                        ->setOriginalForm($horseName)
+                        ->setCanonicalForm($canonicalHorseName)
+                );
+            }
+
+            $context['horseCache'][$horseKey] = $horse;
+        }
+
+        return [$horseKey, $context['horseCache'][$horseKey]];
+    }
+
+    /**
+     * @param array<string, int> $stats
+     * @param array<int, mixed>|null $row
+     */
+    private function skipRow(
+        ?ImportSession $session,
+        array &$stats,
+        int $line,
+        string $errorType,
+        string $message,
+        ?array $row = null,
+        string $severity = 'error'
+    ): void {
+        ++$stats['rows_skipped'];
+        $this->recordImportError($session, $stats, $line, $errorType, $message, $row, $severity);
     }
 
     /**
@@ -420,6 +644,7 @@ class ExcelImportService
         }
 
         $key = strtoupper($name);
+        $canonicalName = strtoupper($this->normalize($name));
         if (isset($personCache[$key])) {
             return $personCache[$key];
         }
@@ -427,34 +652,35 @@ class ExcelImportService
         $person = $this->entityManager->getRepository(Person::class)->findOneBy(['name' => $name]);
 
         if (!$person instanceof Person) {
+            $alias = $this->entityManager->getRepository(PersonAlias::class)->findOneBy([
+                'canonicalForm' => $canonicalName,
+            ]);
+            if ($alias instanceof PersonAlias) {
+                $person = $alias->getPerson();
+            }
+        }
+
+        if (!$person instanceof Person) {
             $person = (new Person())->setName($name);
             $this->entityManager->persist($person);
             ++$stats['persons_created'];
         }
 
+        $existingAlias = $this->entityManager->getRepository(PersonAlias::class)->findOneBy([
+            'canonicalForm' => $canonicalName,
+        ]);
+        if (!$existingAlias instanceof PersonAlias) {
+            $this->entityManager->persist(
+                (new PersonAlias())
+                    ->setPerson($person)
+                    ->setOriginalForm($name)
+                    ->setCanonicalForm($canonicalName)
+            );
+        }
+
         $personCache[$key] = $person;
 
         return $person;
-    }
-
-    /**
-     * @return array{0: ?int, 1: ?int}
-     */
-    private function extractMeetingRaceFromCode(?string $value): array
-    {
-        if ($value === null) {
-            return [null, null];
-        }
-
-        if (preg_match('/R\s*(\d+)\s*C\s*(\d+)/i', $value, $matches) === 1) {
-            return [(int) $matches[1], (int) $matches[2]];
-        }
-
-        if (preg_match('/^(\d)(\d)$/', trim($value), $matches) === 1) {
-            return [(int) $matches[1], (int) $matches[2]];
-        }
-
-        return [null, null];
     }
 
     private function parseDate(?string $value): ?\DateTimeImmutable
@@ -472,5 +698,40 @@ class ExcelImportService
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string, int> $stats
+     * @param array<int, mixed>|null $rowSnapshot
+     */
+    private function recordImportError(
+        ?ImportSession $session,
+        array &$stats,
+        ?int $rowNumber,
+        string $errorType,
+        string $message,
+        ?array $rowSnapshot = null,
+        string $severity = 'error'
+    ): void {
+        ++$stats['error_count'];
+
+        if (!$session instanceof ImportSession) {
+            return;
+        }
+
+        $snapshot = null;
+        if ($rowSnapshot !== null) {
+            $snapshot = array_map(static fn (mixed $value): string => trim((string) $value), $rowSnapshot);
+        }
+
+        $error = (new ImportError())
+            ->setSession($session)
+            ->setRowNumber($rowNumber)
+            ->setErrorType($errorType)
+            ->setSeverity($severity)
+            ->setErrorMessage($message)
+            ->setSourceSnapshot($snapshot);
+
+        $this->entityManager->persist($error);
     }
 }

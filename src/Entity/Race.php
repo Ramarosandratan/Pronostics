@@ -6,7 +6,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'race')]
-#[ORM\UniqueConstraint(name: 'uniq_race_identity', columns: ['race_date', 'hippodrome', 'meeting_number', 'race_number'])]
+#[ORM\UniqueConstraint(name: 'uniq_race_identity', columns: ['race_date', 'hippodrome_id', 'meeting_number', 'race_number'])]
 class Race
 {
     #[ORM\Id]
@@ -17,8 +17,12 @@ class Race
     #[ORM\Column(name: 'race_date', type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $raceDate = null;
 
-    #[ORM\Column(length: 255)]
-    private string $hippodrome;
+    #[ORM\ManyToOne(targetEntity: Hippodrome::class)]
+    #[ORM\JoinColumn(name: 'hippodrome_id', nullable: false, onDelete: 'RESTRICT')]
+    private ?Hippodrome $hippodrome = null;
+
+    #[ORM\Column(name: 'hippodrome', length: 255, nullable: true)]
+    private ?string $hippodromeName = null;
 
     #[ORM\Column(name: 'meeting_number')]
     private int $meetingNumber;
@@ -49,14 +53,41 @@ class Race
         return $this;
     }
 
-    public function getHippodrome(): string
+    public function getHippodrome(): ?Hippodrome
     {
         return $this->hippodrome;
     }
 
-    public function setHippodrome(string $hippodrome): self
+    public function setHippodrome(Hippodrome|string|null $hippodrome): self
     {
-        $this->hippodrome = strtoupper(trim($hippodrome));
+        if ($hippodrome instanceof Hippodrome) {
+            $this->hippodrome = $hippodrome;
+            $this->hippodromeName = $hippodrome->getName();
+
+            return $this;
+        }
+
+        if (is_string($hippodrome)) {
+            $this->hippodrome = null;
+            $this->hippodromeName = strtoupper(trim($hippodrome));
+
+            return $this;
+        }
+
+        $this->hippodrome = null;
+        $this->hippodromeName = null;
+
+        return $this;
+    }
+
+    public function getHippodromeName(): ?string
+    {
+        return $this->hippodromeName;
+    }
+
+    public function setHippodromeName(?string $hippodromeName): self
+    {
+        $this->hippodromeName = $hippodromeName !== null ? strtoupper(trim($hippodromeName)) : null;
 
         return $this;
     }

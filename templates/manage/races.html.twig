@@ -9,8 +9,13 @@
             <label for="race_date">Date (optionnel)</label>
             <input id="race_date" name="race_date" type="date" />
 
-            <label for="hippodrome">Hippodrome</label>
-            <input id="hippodrome" name="hippodrome" type="text" required maxlength="255" placeholder="Ex: VINCENNES" />
+            <label for="hippodrome_id">Hippodrome</label>
+            <select id="hippodrome_id" name="hippodrome_id" required>
+                <option value="">-- Selectionner --</option>
+                {% for hippodrome in hippodromes %}
+                    <option value="{{ hippodrome.id }}">{{ hippodrome.name }}</option>
+                {% endfor %}
+            </select>
 
             <label for="meeting_number">Numero de reunion</label>
             <input id="meeting_number" name="meeting_number" type="number" min="1" required />
@@ -30,6 +35,14 @@
 
     <section class="card">
         <h2>Liste</h2>
+        <form method="get" class="inline-form" style="margin-bottom: 12px;">
+            <label for="per_page_races">Par page</label>
+            <select id="per_page_races" name="per_page" onchange="this.form.submit()">
+                {% for option in perPageOptions %}
+                    <option value="{{ option }}" {% if option == perPage %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+        </form>
         <table>
             <thead>
                 <tr>
@@ -41,26 +54,81 @@
                     <th>Discipline</th>
                     <th>Code source</th>
                     <th>Pronostic</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for race in races %}
                     <tr>
                         <td>{{ race.id }}</td>
-                        <td>{{ race.raceDate ? race.raceDate|date('Y-m-d') : '-' }}</td>
-                        <td>{{ race.hippodrome }}</td>
-                        <td>{{ race.meetingNumber }}</td>
-                        <td>{{ race.raceNumber }}</td>
-                        <td>{{ race.discipline ?: '-' }}</td>
-                        <td>{{ race.sourceDateCode ?: '-' }}</td>
+                        {% if editRace and editRace.id == race.id %}
+                            <td><input name="race_date" type="date" value="{{ race.raceDate ? race.raceDate|date('Y-m-d') : '' }}" form="race-edit-{{ race.id }}" style="width: 145px;" /></td>
+                            <td>
+                                <select name="hippodrome_id" required form="race-edit-{{ race.id }}" style="max-width: 200px;">
+                                    <option value="">-- Selectionner --</option>
+                                    {% for hippodrome in hippodromes %}
+                                        <option value="{{ hippodrome.id }}" {% if race.hippodrome and race.hippodrome.id == hippodrome.id %}selected{% endif %}>{{ hippodrome.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td><input name="meeting_number" type="number" value="{{ race.meetingNumber }}" min="1" required form="race-edit-{{ race.id }}" style="width: 70px;" /></td>
+                            <td><input name="race_number" type="number" value="{{ race.raceNumber }}" min="1" required form="race-edit-{{ race.id }}" style="width: 70px;" /></td>
+                            <td><input name="discipline" type="text" value="{{ race.discipline ?: '' }}" maxlength="20" form="race-edit-{{ race.id }}" style="width: 110px;" /></td>
+                            <td><input name="source_date_code" type="text" value="{{ race.sourceDateCode ?: '' }}" maxlength="30" form="race-edit-{{ race.id }}" style="width: 120px;" /></td>
+                        {% else %}
+                            <td>{{ race.raceDate ? race.raceDate|date('Y-m-d') : '-' }}</td>
+                            <td>{{ race.hippodrome ? race.hippodrome.name : '-' }}</td>
+                            <td>{{ race.meetingNumber }}</td>
+                            <td>{{ race.raceNumber }}</td>
+                            <td>{{ race.discipline ?: '-' }}</td>
+                            <td>{{ race.sourceDateCode ?: '-' }}</td>
+                        {% endif %}
                         <td><a href="{{ path('app_management_race_pronostic', {id: race.id}) }}">Voir</a></td>
+                        <td>
+                            {% if editRace and editRace.id == race.id %}
+                                <form id="race-edit-{{ race.id }}" method="post" action="{{ path('app_management_race_update', { id: race.id }) }}" class="inline-form" style="margin: 0;">
+                                    <input type="hidden" name="page" value="{{ pagination.page }}" />
+                                    <input type="hidden" name="per_page" value="{{ perPage }}" />
+                                    <button type="submit">Enregistrer</button>
+                                    <a href="{{ path('app_management_races', { page: pagination.page, per_page: perPage }) }}">Annuler</a>
+                                </form>
+                            {% else %}
+                                <div class="inline-form">
+                                    <form method="get" action="{{ path('app_management_races') }}" class="inline-form" style="margin: 0;">
+                                        <input type="hidden" name="edit" value="{{ race.id }}" />
+                                        <input type="hidden" name="page" value="{{ pagination.page }}" />
+                                        <input type="hidden" name="per_page" value="{{ perPage }}" />
+                                        <button type="submit">Modifier</button>
+                                    </form>
+                                    <form method="post" action="{{ path('app_management_race_delete', { id: race.id }) }}" class="inline-form" style="margin: 0;">
+                                        <button type="submit">Supprimer</button>
+                                    </form>
+                                </div>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="8">Aucune course enregistree.</td>
+                        <td colspan="9">Aucune course enregistree.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% if pagination.total_pages > 1 %}
+            <div class="inline-form" style="margin-top: 12px; justify-content: space-between;">
+                <div>
+                    {% if pagination.has_prev %}
+                        <a href="{{ path('app_management_races', { page: pagination.prev_page, per_page: perPage }) }}">Precedent</a>
+                    {% endif %}
+                </div>
+                <div class="muted">Page {{ pagination.page }} / {{ pagination.total_pages }} - {{ pagination.total_items }} elements</div>
+                <div>
+                    {% if pagination.has_next %}
+                        <a href="{{ path('app_management_races', { page: pagination.next_page, per_page: perPage }) }}">Suivant</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
     </section>
 {% endblock %}
+

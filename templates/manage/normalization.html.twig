@@ -1,0 +1,156 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Normalisation{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Normalisation des noms</h1>
+        <p class="muted">Suggestions de noms proches et creation d'alias manuels utilises pendant l'import.</p>
+    </section>
+
+    <section class="card">
+        <h2>Creer un alias</h2>
+        <form method="post">
+            <label for="type">Type</label>
+            <select id="type" name="type" required>
+                <option value="horse">Cheval</option>
+                <option value="person">Personne</option>
+            </select>
+
+            <label for="target_id">Cible (ID)</label>
+            <input id="target_id" name="target_id" type="number" min="1" required />
+
+            <label for="alias_name">Alias</label>
+            <input id="alias_name" name="alias_name" type="text" maxlength="255" required />
+
+            <button type="submit">Valider alias</button>
+        </form>
+        <p class="muted">Astuce: vous pouvez recuperer l'ID dans les listes ci-dessous.</p>
+    </section>
+
+    <section class="card">
+        <h2>Suggestions chevaux</h2>
+        {% if horseSuggestions is empty %}
+            <p class="muted">Aucune suggestion.</p>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom A</th>
+                        <th>Nom B</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for suggestion in horseSuggestions %}
+                        <tr>
+                            <td>{{ suggestion.left }}</td>
+                            <td>{{ suggestion.right }}</td>
+                            <td>{{ (suggestion.score * 100)|number_format(1, '.', ' ') }}%</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Suggestions personnes</h2>
+        {% if personSuggestions is empty %}
+            <p class="muted">Aucune suggestion.</p>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nom A</th>
+                        <th>Nom B</th>
+                        <th>Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for suggestion in personSuggestions %}
+                        <tr>
+                            <td>{{ suggestion.left }}</td>
+                            <td>{{ suggestion.right }}</td>
+                            <td>{{ (suggestion.score * 100)|number_format(1, '.', ' ') }}%</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Chevaux (pour IDs)</h2>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Nom</th></tr>
+            </thead>
+            <tbody>
+                {% for horse in horses %}
+                    <tr><td>{{ horse.id }}</td><td>{{ horse.name }}</td></tr>
+                {% else %}
+                    <tr><td colspan="2">Aucun cheval.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Personnes (pour IDs)</h2>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Nom</th></tr>
+            </thead>
+            <tbody>
+                {% for person in people %}
+                    <tr><td>{{ person.id }}</td><td>{{ person.name }}</td></tr>
+                {% else %}
+                    <tr><td colspan="2">Aucune personne.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Alias chevaux recents</h2>
+        {% if horseAliases is empty %}
+            <p class="muted">Aucun alias cheval.</p>
+        {% else %}
+            <table>
+                <thead><tr><th>ID</th><th>Cible</th><th>Alias</th><th>Canonical</th></tr></thead>
+                <tbody>
+                    {% for alias in horseAliases %}
+                        <tr>
+                            <td>{{ alias.id }}</td>
+                            <td>{{ alias.horse.id }} - {{ alias.horse.name }}</td>
+                            <td>{{ alias.originalForm }}</td>
+                            <td>{{ alias.canonicalForm }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+
+    <section class="card">
+        <h2>Alias personnes recents</h2>
+        {% if personAliases is empty %}
+            <p class="muted">Aucun alias personne.</p>
+        {% else %}
+            <table>
+                <thead><tr><th>ID</th><th>Cible</th><th>Alias</th><th>Canonical</th></tr></thead>
+                <tbody>
+                    {% for alias in personAliases %}
+                        <tr>
+                            <td>{{ alias.id }}</td>
+                            <td>{{ alias.person.id }} - {{ alias.person.name }}</td>
+                            <td>{{ alias.originalForm }}</td>
+                            <td>{{ alias.canonicalForm }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+{% endblock %}

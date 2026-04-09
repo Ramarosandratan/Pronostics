@@ -23,27 +23,88 @@
 
     <section class="card">
         <h2>Liste</h2>
+        <form method="get" class="inline-form" style="margin-bottom: 12px;">
+            <label for="per_page_horses">Par page</label>
+            <select id="per_page_horses" name="per_page" onchange="this.form.submit()">
+                {% for option in perPageOptions %}
+                    <option value="{{ option }}" {% if option == perPage %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+            </select>
+        </form>
         <table>
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>Nom</th>
+                    <th>Cheval</th>
                     <th>Sexe</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for horse in horses %}
                     <tr>
                         <td>{{ horse.id }}</td>
-                        <td>{{ horse.name }}</td>
-                        <td>{{ horse.sex ?: '-' }}</td>
+                        {% if editHorse and editHorse.id == horse.id %}
+                            <td>
+                                <input name="name" type="text" value="{{ horse.name }}" required maxlength="255" form="horse-edit-{{ horse.id }}" />
+                            </td>
+                            <td>
+                                <select name="sex" form="horse-edit-{{ horse.id }}">
+                                    <option value="" {% if horse.sex is null %}selected{% endif %}>-</option>
+                                    <option value="M" {% if horse.sex == 'M' %}selected{% endif %}>M</option>
+                                    <option value="F" {% if horse.sex == 'F' %}selected{% endif %}>F</option>
+                                    <option value="H" {% if horse.sex == 'H' %}selected{% endif %}>H</option>
+                                </select>
+                            </td>
+                            <td>
+                                <form id="horse-edit-{{ horse.id }}" method="post" action="{{ path('app_management_horse_update', { id: horse.id }) }}" class="inline-form" style="margin: 0;">
+                                    <input type="hidden" name="page" value="{{ pagination.page }}" />
+                                    <input type="hidden" name="per_page" value="{{ perPage }}" />
+                                    <button type="submit">Enregistrer</button>
+                                    <a href="{{ path('app_management_horses', { page: pagination.page, per_page: perPage }) }}">Annuler</a>
+                                </form>
+                            </td>
+                        {% else %}
+                            <td>{{ horse.name }}</td>
+                            <td>{{ horse.sex ?: '-' }}</td>
+                            <td>
+                                <div class="inline-form">
+                                    <form method="get" action="{{ path('app_management_horses') }}" class="inline-form" style="margin: 0;">
+                                        <input type="hidden" name="edit" value="{{ horse.id }}" />
+                                        <input type="hidden" name="page" value="{{ pagination.page }}" />
+                                        <input type="hidden" name="per_page" value="{{ perPage }}" />
+                                        <button type="submit">Modifier</button>
+                                    </form>
+                                    <form method="post" action="{{ path('app_management_horse_delete', { id: horse.id }) }}" class="inline-form" style="margin: 0;">
+                                        <input type="hidden" name="page" value="{{ pagination.page }}" />
+                                        <input type="hidden" name="per_page" value="{{ perPage }}" />
+                                        <button type="submit">Supprimer</button>
+                                    </form>
+                                </div>
+                            </td>
+                        {% endif %}
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="3">Aucun cheval enregistre.</td>
+                        <td colspan="4">Aucun cheval enregistre.</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% if pagination.total_pages > 1 %}
+            <div class="inline-form" style="margin-top: 12px; justify-content: space-between;">
+                <div>
+                    {% if pagination.has_prev %}
+                        <a href="{{ path('app_management_horses', { page: pagination.prev_page, per_page: perPage }) }}">Precedent</a>
+                    {% endif %}
+                </div>
+                <div class="muted">Page {{ pagination.page }} / {{ pagination.total_pages }} - {{ pagination.total_items }} elements</div>
+                <div>
+                    {% if pagination.has_next %}
+                        <a href="{{ path('app_management_horses', { page: pagination.next_page, per_page: perPage }) }}">Suivant</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
     </section>
 {% endblock %}
