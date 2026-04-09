@@ -7,7 +7,9 @@ use App\Entity\Hippodrome;
 use App\Entity\Participation;
 use App\Entity\Person;
 use App\Entity\Race;
-use App\Service\PronosticScoringService;
+use App\Service\PronosticComparisonService;
+use App\Service\PronosticKpiService;
+use App\Service\PronosticSnapshotService;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -313,14 +315,40 @@ class ManagementController extends AbstractController
     }
 
     #[Route('/courses/{id}/pronostic', name: 'app_management_race_pronostic', methods: ['GET'])]
-    public function racePronostic(Race $race, PronosticScoringService $scoringService): Response
+    public function racePronostic(
+        Race $race,
+        PronosticSnapshotService $snapshotService,
+        PronosticComparisonService $comparisonService,
+    ): Response
     {
-        $rankings = $scoringService->scoreRace($race);
+        $rankings = $snapshotService->capturePreRaceSnapshot($race);
+        $comparisonService->compareRace($race);
 
         return $this->render('manage/pronostic.html.twig', [
             'race' => $race,
             'topRankings' => array_slice($rankings, 0, 5),
             'rankings' => $rankings,
+        ]);
+    }
+
+    #[Route('/dashboard', name: 'app_management_dashboard', methods: ['GET'])]
+    public function dashboard(Request $request, PronosticKpiService $kpiService): Response
+    {
+        $fromInput = trim((string) $request->query->get('from', ''));
+        $toInput = trim((string) $request->query->get('to', ''));
+
+        $from = $this->parseDate($fromInput);
+        $to = $this->parseDate($toInput);
+
+        $data = $kpiService->buildDashboard($from, $to);
+
+        return $this->render('manage/dashboard.html.twig', [
+            'summary' => $data['summary'],
+            'recent' => $data['recent'],
+            'filters' => [
+                'from' => $from?->format('Y-m-d') ?? $fromInput,
+                'to' => $to?->format('Y-m-d') ?? $toInput,
+            ],
         ]);
     }
 

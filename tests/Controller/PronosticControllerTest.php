@@ -4,7 +4,8 @@ namespace App\Tests\Controller;
 
 use App\Controller\PronosticController;
 use App\Entity\Race;
-use App\Service\PronosticScoringService;
+use App\Service\PronosticComparisonService;
+use App\Service\PronosticSnapshotService;
 use PHPUnit\Framework\TestCase;
 
 class PronosticControllerTest extends TestCase
@@ -37,14 +38,19 @@ class PronosticControllerTest extends TestCase
             ];
         }
 
-        $scoringService = $this->createMock(PronosticScoringService::class);
-        $scoringService->expects($this->once())
-            ->method('scoreRace')
+        $snapshotService = $this->createMock(PronosticSnapshotService::class);
+        $snapshotService->expects($this->once())
+            ->method('capturePreRaceSnapshot')
             ->with($race)
             ->willReturn($rankings);
 
+        $comparisonService = $this->createMock(PronosticComparisonService::class);
+        $comparisonService->expects($this->once())
+            ->method('compareRace')
+            ->with($race);
+
         $controller = new PronosticController();
-        $response = $controller->show($race, $scoringService);
+        $response = $controller->show($race, $snapshotService, $comparisonService);
 
         self::assertSame(200, $response->getStatusCode());
 

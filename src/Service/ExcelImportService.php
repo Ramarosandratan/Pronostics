@@ -17,7 +17,10 @@ use Shuchkin\SimpleXLSX;
 
 class ExcelImportService
 {
-    public function __construct(private readonly EntityManagerInterface $entityManager)
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly PronosticComparisonService $comparisonService,
+    )
     {
     }
 
@@ -66,6 +69,7 @@ class ExcelImportService
             'horseCache' => [],
             'personCache' => [],
             'participationSeen' => [],
+            'touchedRaces' => [],
         ];
 
         $connection = $this->entityManager->getConnection();
@@ -84,6 +88,9 @@ class ExcelImportService
             }
 
             $this->entityManager->flush();
+            foreach ($context['touchedRaces'] as $race) {
+                $this->comparisonService->compareRace($race);
+            }
             $stats['import_session_id'] = (int) ($importSession?->getId() ?? 0);
 
             if ($dryRun) {
@@ -169,7 +176,7 @@ class ExcelImportService
      * @param array<int, array<int, mixed>> $rows
      * @param array<string, int> $indexes
      * @param array<string, int> $stats
-     * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>} $context
+    * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>, touchedRaces: array<string, Race>} $context
      */
     private function processRows(array $rows, array $indexes, ?ImportSession $session, array &$stats, array &$context): int
     {
@@ -200,7 +207,7 @@ class ExcelImportService
      * @param array<int, mixed> $row
      * @param array<string, int> $indexes
      * @param array<string, int> $stats
-     * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>} $context
+    * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>, touchedRaces: array<string, Race>} $context
      */
     private function processRow(
         array $row,
@@ -323,6 +330,7 @@ class ExcelImportService
 
             $this->entityManager->persist($participation);
             $context['participationSeen'][$participationKey] = true;
+            $context['touchedRaces'][$raceIdentity] = $race;
             ++$stats['rows_imported'];
         }
     }
@@ -331,7 +339,7 @@ class ExcelImportService
      * @param array<int, mixed> $row
      * @param array<string, int> $indexes
      * @param array<string, int> $stats
-     * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>} $context
+    * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>, touchedRaces: array<string, Race>} $context
      * @param array{hippodrome: string, meetingNumber: int, raceNumber: int, sourceDateCode: ?string, raceDate: ?\DateTimeImmutable} $raceInfo
      *
      * @return array{0: string, 1: Race}
@@ -390,7 +398,7 @@ class ExcelImportService
 
     /**
      * @param array<string, int> $stats
-     * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>} $context
+    * @param array{raceCache: array<string, Race>, horseCache: array<string, Horse>, personCache: array<string, Person>, participationSeen: array<string, bool>, touchedRaces: array<string, Race>} $context
      *
      * @return array{0: string, 1: Horse}
      */
@@ -734,4 +742,5 @@ class ExcelImportService
 
         $this->entityManager->persist($error);
     }
+
 }
