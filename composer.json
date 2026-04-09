@@ -23,6 +23,7 @@
         "doctrine/doctrine-bundle": "^2.18",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6",
+        "phpunit/phpunit": "11.5.50",
         "symfony/maker-bundle": "^1.67"
     },
     "config": {

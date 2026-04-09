@@ -1,0 +1,86 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Pronostic course{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Pronostic course #{{ race.id }}</h1>
+        <p class="muted">
+            {{ race.hippodrome }} - R{{ race.meetingNumber }} C{{ race.raceNumber }}
+            {% if race.raceDate %}
+                - {{ race.raceDate|date('Y-m-d') }}
+            {% endif %}
+            {% if race.discipline %}
+                - {{ race.discipline }}
+            {% endif %}
+        </p>
+        <p>
+            Endpoint JSON:
+            <a href="{{ path('app_pronostic_show', {id: race.id}) }}">{{ path('app_pronostic_show', {id: race.id}) }}</a>
+        </p>
+    </section>
+
+    <section class="card">
+        <h2>Top 5 chevaux</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rang</th>
+                    <th>Cheval</th>
+                    <th>N degre</th>
+                    <th>Score global</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in topRankings %}
+                    <tr>
+                        <td>{{ row.rank }}</td>
+                        <td>{{ row.horse_name }}</td>
+                        <td>{{ row.saddle_number ?: '-' }}</td>
+                        <td>{{ row.score|number_format(2, '.', ' ') }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="4">Aucune participation disponible pour cette course.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Detail des sous-scores</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rang</th>
+                    <th>Cheval</th>
+                    <th>Position (45%)</th>
+                    <th>Cote (25%)</th>
+                    <th>Performance (15%)</th>
+                    <th>Gains (10%)</th>
+                    <th>Age (5%)</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rankings %}
+                    <tr>
+                        <td>{{ row.rank }}</td>
+                        <td>{{ row.horse_name }}</td>
+                        <td>{{ row.sub_scores.position|number_format(2, '.', ' ') }}</td>
+                        <td>{{ row.sub_scores.odds|number_format(2, '.', ' ') }}</td>
+                        <td>{{ row.sub_scores.performance|number_format(2, '.', ' ') }}</td>
+                        <td>{{ row.sub_scores.earnings|number_format(2, '.', ' ') }}</td>
+                        <td>{{ row.sub_scores.age|number_format(2, '.', ' ') }}</td>
+                        <td><strong>{{ row.score|number_format(2, '.', ' ') }}</strong></td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="8">Aucune participation disponible pour cette course.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

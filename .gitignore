@@ -8,6 +8,7 @@
 /public/build/
 /var/
 /vendor/
+.phpunit.cache/
 /pbet_res.xlsx
 ###< symfony/framework-bundle ###
 
