@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{% block title %}Gestion des donnees{% endblock %}</title>
+        <style>
+            :root {
+                --bg: #f4f6fb;
+                --surface: #ffffff;
+                --line: #dfe5f0;
+                --text: #192230;
+                --accent: #0d66d0;
+                --ok: #0e7a45;
+                --error: #a32121;
+            }
+            * { box-sizing: border-box; }
+            body {
+                margin: 0;
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(180deg, #eef3ff 0%, var(--bg) 100%);
+                color: var(--text);
+            }
+            .container {
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .topbar {
+                background: var(--surface);
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                padding: 14px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-bottom: 20px;
+            }
+            .topbar a {
+                text-decoration: none;
+                color: var(--accent);
+                font-weight: 600;
+            }
+            .card {
+                background: var(--surface);
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 16px;
+            }
+            h1, h2 {
+                margin-top: 0;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border-bottom: 1px solid var(--line);
+                padding: 8px;
+                text-align: left;
+                vertical-align: top;
+            }
+            form {
+                display: grid;
+                gap: 10px;
+            }
+            input, select, button {
+                padding: 10px;
+                border-radius: 8px;
+                border: 1px solid #c4cedf;
+                font: inherit;
+            }
+            button {
+                width: fit-content;
+                background: var(--accent);
+                color: #fff;
+                border: none;
+                cursor: pointer;
+                font-weight: 600;
+            }
+            .flash {
+                padding: 10px;
+                border-radius: 8px;
+                margin-bottom: 10px;
+            }
+            .flash.success {
+                background: #e3f7ed;
+                color: var(--ok);
+            }
+            .flash.error {
+                background: #fde9e9;
+                color: var(--error);
+            }
+            .stats {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 12px;
+            }
+            .stat {
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                padding: 12px;
+                background: #fafcff;
+            }
+            a.stat {
+                text-decoration: none;
+                color: var(--text);
+                transition: border-color 0.2s ease, transform 0.2s ease;
+            }
+            a.stat:hover {
+                border-color: var(--accent);
+                transform: translateY(-1px);
+            }
+            .muted {
+                color: #4a5d78;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <nav class="topbar">
+                <a href="{{ path('app_home') }}">Accueil app</a>
+                <a href="{{ path('app_management_index') }}">Gestion</a>
+                <a href="{{ path('app_management_people') }}">Personnes</a>
+                <a href="{{ path('app_management_horses') }}">Chevaux</a>
+                <a href="{{ path('app_management_races') }}">Courses</a>
+                <a href="{{ path('app_management_participations') }}">Participations</a>
+            </nav>
+
+            {% for message in app.flashes('success') %}
+                <div class="flash success">{{ message }}</div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="flash error">{{ message }}</div>
+            {% endfor %}
+
+            {% block body %}{% endblock %}
+        </div>
+    </body>
+</html>

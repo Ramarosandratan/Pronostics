@@ -1,0 +1,38 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Personnes{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Personnes</h1>
+        <form method="post">
+            <label for="name">Nom</label>
+            <input id="name" name="name" type="text" required maxlength="255" placeholder="Ex: Jean Dupont" />
+            <button type="submit">Ajouter</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Liste</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nom</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for person in people %}
+                    <tr>
+                        <td>{{ person.id }}</td>
+                        <td>{{ person.name }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="2">Aucune personne enregistree.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

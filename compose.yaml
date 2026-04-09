@@ -19,7 +19,40 @@ services:
       # - ./docker/db/data:/var/lib/postgresql/data:rw
 ###< doctrine/doctrine-bundle ###
 
+###> symfony/webpack-encore-bundle ###
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.php
+    working_dir: /app
+    environment:
+      APP_ENV: ${APP_ENV:-dev}
+      APP_SECRET: ${APP_SECRET:-changeme}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-16}&charset=utf8
+    volumes:
+      - .:/app:delegated
+      - app_vendor:/app/vendor
+    depends_on:
+      database:
+        condition: service_healthy
+    command: /bin/bash -c "composer install && php -S 0.0.0.0:8000 -t public"
+
+  node:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.node
+    working_dir: /app
+    volumes:
+      - .:/app:delegated
+      - node_modules:/app/node_modules
+    command: /bin/sh -c "npm install && npm run watch"
+###< symfony/webpack-encore-bundle ###
+
 volumes:
 ###> doctrine/doctrine-bundle ###
   database_data:
 ###< doctrine/doctrine-bundle ###
+###> symfony/webpack-encore-bundle ###
+  app_vendor:
+  node_modules:
+###< symfony/webpack-encore-bundle ###

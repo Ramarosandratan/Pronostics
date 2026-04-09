@@ -1,0 +1,64 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Courses{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Courses</h1>
+        <form method="post">
+            <label for="race_date">Date (optionnel)</label>
+            <input id="race_date" name="race_date" type="date" />
+
+            <label for="hippodrome">Hippodrome</label>
+            <input id="hippodrome" name="hippodrome" type="text" required maxlength="255" placeholder="Ex: VINCENNES" />
+
+            <label for="meeting_number">Numero de reunion</label>
+            <input id="meeting_number" name="meeting_number" type="number" min="1" required />
+
+            <label for="race_number">Numero de course</label>
+            <input id="race_number" name="race_number" type="number" min="1" required />
+
+            <label for="discipline">Discipline (optionnel)</label>
+            <input id="discipline" name="discipline" type="text" maxlength="20" placeholder="Ex: TROT" />
+
+            <label for="source_date_code">Code date source (optionnel)</label>
+            <input id="source_date_code" name="source_date_code" type="text" maxlength="30" placeholder="Ex: 20260409" />
+
+            <button type="submit">Ajouter</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Liste</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Hippodrome</th>
+                    <th>R</th>
+                    <th>C</th>
+                    <th>Discipline</th>
+                    <th>Code source</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for race in races %}
+                    <tr>
+                        <td>{{ race.id }}</td>
+                        <td>{{ race.raceDate ? race.raceDate|date('Y-m-d') : '-' }}</td>
+                        <td>{{ race.hippodrome }}</td>
+                        <td>{{ race.meetingNumber }}</td>
+                        <td>{{ race.raceNumber }}</td>
+                        <td>{{ race.discipline ?: '-' }}</td>
+                        <td>{{ race.sourceDateCode ?: '-' }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7">Aucune course enregistree.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

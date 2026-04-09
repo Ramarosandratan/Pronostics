@@ -1,0 +1,36 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Accueil - PMU Pronostics{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Accueil</h1>
+        <p class="muted">Bienvenue sur PMU Pronostics. Utilisez le menu pour naviguer entre les pages de consultation et d'ajout de donnees.</p>
+    </section>
+
+    <section class="card">
+        <h2>Acces rapide</h2>
+        <div class="stats">
+            <a class="stat" href="{{ path('app_management_index') }}">
+                <strong>Gestion</strong><br />
+                Tableau de bord
+            </a>
+            <a class="stat" href="{{ path('app_management_people') }}">
+                <strong>Personnes</strong><br />
+                Voir / ajouter
+            </a>
+            <a class="stat" href="{{ path('app_management_horses') }}">
+                <strong>Chevaux</strong><br />
+                Voir / ajouter
+            </a>
+            <a class="stat" href="{{ path('app_management_races') }}">
+                <strong>Courses</strong><br />
+                Voir / ajouter
+            </a>
+            <a class="stat" href="{{ path('app_management_participations') }}">
+                <strong>Participations</strong><br />
+                Consulter
+            </a>
+        </div>
+    </section>
+{% endblock %}

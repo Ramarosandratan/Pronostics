@@ -1,0 +1,28 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Accueil{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Gestion des donnees</h1>
+        <p class="muted">Pages simples pour consulter les enregistrements et ajouter de nouvelles donnees.</p>
+        <div class="stats">
+            <div class="stat">
+                <strong>{{ counts.persons }}</strong><br />
+                Personnes
+            </div>
+            <div class="stat">
+                <strong>{{ counts.horses }}</strong><br />
+                Chevaux
+            </div>
+            <div class="stat">
+                <strong>{{ counts.races }}</strong><br />
+                Courses
+            </div>
+            <div class="stat">
+                <strong>{{ counts.participations }}</strong><br />
+                Participations
+            </div>
+        </div>
+    </section>
+{% endblock %}
