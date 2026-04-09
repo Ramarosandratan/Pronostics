@@ -40,6 +40,7 @@
                     <th>C</th>
                     <th>Discipline</th>
                     <th>Code source</th>
+                    <th>Pronostic</th>
                 </tr>
             </thead>
             <tbody>
@@ -52,10 +53,11 @@
                         <td>{{ race.raceNumber }}</td>
                         <td>{{ race.discipline ?: '-' }}</td>
                         <td>{{ race.sourceDateCode ?: '-' }}</td>
+                        <td><a href="{{ path('app_management_race_pronostic', {id: race.id}) }}">Voir</a></td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="7">Aucune course enregistree.</td>
+                        <td colspan="8">Aucune course enregistree.</td>
                     </tr>
                 {% endfor %}
             </tbody>

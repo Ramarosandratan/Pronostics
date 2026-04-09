@@ -6,6 +6,7 @@ use App\Entity\Horse;
 use App\Entity\Participation;
 use App\Entity\Person;
 use App\Entity\Race;
+use App\Service\PronosticScoringService;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -188,6 +189,18 @@ class ManagementController extends AbstractController
 
         return $this->render('manage/participations.html.twig', [
             'participations' => $participations,
+        ]);
+    }
+
+    #[Route('/courses/{id}/pronostic', name: 'app_management_race_pronostic', methods: ['GET'])]
+    public function racePronostic(Race $race, PronosticScoringService $scoringService): Response
+    {
+        $rankings = $scoringService->scoreRace($race);
+
+        return $this->render('manage/pronostic.html.twig', [
+            'race' => $race,
+            'topRankings' => array_slice($rankings, 0, 5),
+            'rankings' => $rankings,
         ]);
     }
 
