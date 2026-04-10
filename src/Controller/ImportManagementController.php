@@ -4,15 +4,21 @@ namespace App\Controller;
 
 use App\Entity\ImportError;
 use App\Entity\ImportSession;
+use App\Service\ExcelImportService;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/gestion/imports')]
 class ImportManagementController extends AbstractController
 {
+    public function __construct(private readonly ExcelImportService $importService)
+    {
+    }
+
     #[Route('', name: 'app_management_import_sessions', methods: ['GET'])]
     public function sessions(EntityManagerInterface $entityManager): Response
     {
@@ -56,6 +62,28 @@ class ImportManagementController extends AbstractController
             'session' => $session,
             'errors' => $errors,
         ]);
+    }
+
+    #[Route('/sync', name: 'app_management_import_sync', methods: ['POST'])]
+    public function synchronize(): JsonResponse
+    {
+        try {
+            $projectDir = $this->getParameter('kernel.project_dir');
+            $filePath = $projectDir . '/pbet_res.xlsx';
+
+            $stats = $this->importService->import($filePath, false);
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Synchronisation réussie',
+                'stats' => $stats,
+            ]);
+        } catch (\Throwable $exception) {
+            return $this->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], Response::HTTP_BAD_REQUEST);
+        }
     }
 
     private function isMissingTableException(\Throwable $exception): bool
