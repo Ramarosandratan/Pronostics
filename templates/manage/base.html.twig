@@ -20,102 +20,85 @@
                 font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
                 background: linear-gradient(180deg, #eef3ff 0%, var(--bg) 100%);
                 color: var(--text);
-                padding-top: 60px;
+                margin-left: 280px;
             }
             .navbar {
                 position: fixed;
                 top: 0;
                 left: 0;
-                right: 0;
+                width: 280px;
+                height: 100vh;
                 background: var(--surface);
-                border-bottom: 2px solid var(--line);
+                border-right: 2px solid var(--line);
                 z-index: 1000;
-                height: 60px;
                 display: flex;
-                align-items: center;
-                padding: 0 20px;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                flex-direction: column;
+                padding: 0;
+                box-shadow: 2px 0 8px rgba(0, 0, 0, 0.08);
+                overflow-y: auto;
             }
             .navbar-brand {
                 font-weight: 700;
-                font-size: 1.2rem;
+                font-size: 1.3rem;
                 color: var(--accent);
                 text-decoration: none;
-                margin-right: 30px;
+                padding: 20px;
+                border-bottom: 2px solid var(--line);
+                display: block;
+                text-align: center;
                 white-space: nowrap;
-                padding-right: 20px;
-                border-right: 2px solid var(--line);
             }
             .navbar-links {
                 display: flex;
+                flex-direction: column;
                 gap: 0;
                 flex: 1;
-                align-items: center;
-                height: 100%;
                 list-style: none;
                 margin: 0;
                 padding: 0;
             }
             .navbar-group {
                 display: flex;
-                align-items: center;
-                height: 100%;
+                flex-direction: column;
                 gap: 0;
-                border-right: 1px solid var(--line);
-                padding-right: 20px;
-                margin-right: 20px;
+                border-bottom: 1px solid var(--line);
+                padding: 10px 0;
             }
             .navbar-group:last-child {
-                border-right: none;
+                border-bottom: none;
             }
             .navbar-link {
                 text-decoration: none;
                 color: var(--text);
                 font-weight: 500;
-                padding: 0 12px;
-                height: 100%;
+                padding: 12px 20px;
                 display: flex;
                 align-items: center;
                 transition: color 0.2s ease, background 0.2s ease;
-                white-space: nowrap;
                 position: relative;
             }
             .navbar-link:hover {
                 color: var(--accent);
+                background: #f0f5ff;
             }
-            .navbar-link::after {
+            .navbar-link::before {
                 content: '';
                 position: absolute;
+                left: 0;
+                top: 0;
                 bottom: 0;
-                left: 12px;
-                right: 12px;
-                height: 3px;
+                width: 4px;
                 background: var(--accent);
                 opacity: 0;
                 transition: opacity 0.2s ease;
             }
-            .navbar-link:hover::after {
+            .navbar-link:hover::before {
                 opacity: 1;
             }
             .container {
                 max-width: 1100px;
                 margin: 0 auto;
                 padding: 20px;
-            }
-            .topbar {
-                background: var(--surface);
-                border: 1px solid var(--line);
-                border-radius: 12px;
-                padding: 14px;
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-                margin-bottom: 20px;
-            }
-            .topbar a {
-                text-decoration: none;
-                color: var(--accent);
-                font-weight: 600;
             }
             .card {
                 background: var(--surface);
@@ -203,7 +186,7 @@
             <a href="{{ path('app_management_index') }}" class="navbar-brand">📊 Pronostics</a>
             <ul class="navbar-links">
                 <div class="navbar-group">
-                    <a href="{{ path('app_home') }}" class="navbar-link">Accueil</a>
+                    <a href="{{ path('app_home') }}" class="navbar-link">🏠 Accueil</a>
                 </div>
                 <div class="navbar-group">
                     <a href="{{ path('app_management_people') }}" class="navbar-link">👤 Personnes</a>
