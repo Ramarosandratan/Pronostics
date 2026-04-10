@@ -20,16 +20,17 @@ class PronosticSnapshotService
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function capturePreRaceSnapshot(Race $race): array
+    public function capturePreRaceSnapshot(Race $race, ?string $mode = null): array
     {
-        $rankings = $this->scoringService->scoreRace($race);
+        $configuration = $this->scoringService->resolveScoringConfiguration($mode);
+        $rankings = $this->scoringService->scoreRace($race, $configuration['mode']);
         if ($rankings === []) {
             return [];
         }
 
         try {
             $snapshot = $this->findOrCreateSnapshot($race);
-            $this->prepareSnapshot($snapshot, count($rankings));
+            $this->prepareSnapshot($snapshot, count($rankings), $configuration['mode'], $configuration['weights']);
             $participationById = $this->loadParticipationMap($race);
             $this->attachPredictions($snapshot, $rankings, $participationById);
 
@@ -63,7 +64,10 @@ class PronosticSnapshotService
         return $snapshot;
     }
 
-    private function prepareSnapshot(PronosticSnapshot $snapshot, int $totalEntries): void
+    /**
+     * @param array<string, float> $weights
+     */
+    private function prepareSnapshot(PronosticSnapshot $snapshot, int $totalEntries, string $mode, array $weights): void
     {
         $snapshot
             ->setUpdatedAt(new \DateTimeImmutable())
@@ -71,6 +75,8 @@ class PronosticSnapshotService
             ->setComparedAt(null)
             ->setComparableEntries(0)
             ->setTotalEntries($totalEntries)
+            ->setScoringMode($mode)
+            ->setScoringWeights($weights)
             ->clearPredictions()
             ->clearMetrics();
     }

@@ -14,6 +14,7 @@
             <input id="to" type="date" name="to" value="{{ filters.to }}" />
             <button type="submit">Filtrer</button>
             <a href="{{ path('app_management_dashboard') }}">Reinitialiser</a>
+            <a href="{{ path('app_management_dashboard_export', {from: filters.from, to: filters.to}) }}">Exporter CSV</a>
         </form>
 
         <div class="stats" style="margin-top: 12px;">

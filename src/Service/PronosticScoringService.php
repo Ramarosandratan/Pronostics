@@ -8,21 +8,37 @@ use Doctrine\ORM\EntityManagerInterface;
 
 class PronosticScoringService
 {
-    private const POSITION_WEIGHT = 45.0;
-    private const ODDS_WEIGHT = 25.0;
-    private const PERFORMANCE_WEIGHT = 15.0;
-    private const EARNINGS_WEIGHT = 10.0;
-    private const AGE_WEIGHT = 5.0;
+    public const MODE_CONSERVATIVE = 'conservative';
+    public const MODE_AGGRESSIVE = 'aggressive';
 
-    public function __construct(private readonly EntityManagerInterface $entityManager)
+    private const WEIGHT_KEYS = ['position', 'odds', 'performance', 'earnings', 'age'];
+    private const DEFAULT_WEIGHTS = [
+        'position' => 45.0,
+        'odds' => 25.0,
+        'performance' => 15.0,
+        'earnings' => 10.0,
+        'age' => 5.0,
+    ];
+
+    /**
+     * @param array<string, array<string, int|float|string>> $scoringProfiles
+     */
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly array $scoringProfiles = [],
+        private readonly string $defaultMode = self::MODE_CONSERVATIVE,
+    )
     {
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function scoreRace(Race $race): array
+    public function scoreRace(Race $race, ?string $mode = null): array
     {
+        $configuration = $this->resolveScoringConfiguration($mode);
+        $weights = $configuration['weights'];
+
         $participations = $this->entityManager->createQuery(
             'SELECT p, h
             FROM App\\Entity\\Participation p
@@ -49,11 +65,11 @@ class PronosticScoringService
             $ageScore = $this->ageScore($participation->getAgeAtRace());
 
             $globalScore = (
-                ($positionScore * self::POSITION_WEIGHT)
-                + ($oddsScore * self::ODDS_WEIGHT)
-                + ($performanceScore * self::PERFORMANCE_WEIGHT)
-                + ($earningsScore * self::EARNINGS_WEIGHT)
-                + ($ageScore * self::AGE_WEIGHT)
+                ($positionScore * $weights['position'])
+                + ($oddsScore * $weights['odds'])
+                + ($performanceScore * $weights['performance'])
+                + ($earningsScore * $weights['earnings'])
+                + ($ageScore * $weights['age'])
             ) / 100.0;
 
             $scored[] = [
@@ -92,6 +108,53 @@ class PronosticScoringService
         unset($item);
 
         return $scored;
+    }
+
+    /**
+     * @return array{mode: string, weights: array{position: float, odds: float, performance: float, earnings: float, age: float}}
+     */
+    public function resolveScoringConfiguration(?string $mode = null): array
+    {
+        $effectiveMode = $this->normalizeMode($mode);
+        $profiles = $this->scoringProfiles;
+        $profile = $profiles[$effectiveMode] ?? self::DEFAULT_WEIGHTS;
+
+        $weights = [];
+        foreach (self::WEIGHT_KEYS as $key) {
+            $raw = $profile[$key] ?? self::DEFAULT_WEIGHTS[$key];
+            $weights[$key] = max(0.0, (float) $raw);
+        }
+
+        $total = array_sum($weights);
+        if ($total <= 0.0) {
+            $weights = self::DEFAULT_WEIGHTS;
+            $total = 100.0;
+        }
+
+        if (abs($total - 100.0) > 0.00001) {
+            foreach (self::WEIGHT_KEYS as $key) {
+                $weights[$key] = ($weights[$key] / $total) * 100.0;
+            }
+        }
+
+        return [
+            'mode' => $effectiveMode,
+            'weights' => $weights,
+        ];
+    }
+
+    private function normalizeMode(?string $mode): string
+    {
+        $normalizedMode = strtolower(trim((string) $mode));
+        if (!in_array($normalizedMode, [self::MODE_CONSERVATIVE, self::MODE_AGGRESSIVE], true)) {
+            $normalizedMode = strtolower(trim($this->defaultMode));
+        }
+
+        if (!in_array($normalizedMode, [self::MODE_CONSERVATIVE, self::MODE_AGGRESSIVE], true)) {
+            return self::MODE_CONSERVATIVE;
+        }
+
+        return $normalizedMode;
     }
 
     private function positionScore(?int $position, int $fieldSize): float

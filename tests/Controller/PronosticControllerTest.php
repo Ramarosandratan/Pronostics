@@ -5,8 +5,10 @@ namespace App\Tests\Controller;
 use App\Controller\PronosticController;
 use App\Entity\Race;
 use App\Service\PronosticComparisonService;
+use App\Service\PronosticScoringService;
 use App\Service\PronosticSnapshotService;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Request;
 
 class PronosticControllerTest extends TestCase
 {
@@ -41,7 +43,7 @@ class PronosticControllerTest extends TestCase
         $snapshotService = $this->createMock(PronosticSnapshotService::class);
         $snapshotService->expects($this->once())
             ->method('capturePreRaceSnapshot')
-            ->with($race)
+            ->with($race, PronosticScoringService::MODE_CONSERVATIVE)
             ->willReturn($rankings);
 
         $comparisonService = $this->createMock(PronosticComparisonService::class);
@@ -49,8 +51,25 @@ class PronosticControllerTest extends TestCase
             ->method('compareRace')
             ->with($race);
 
+        $scoringService = $this->createMock(PronosticScoringService::class);
+        $scoringService->expects($this->once())
+            ->method('resolveScoringConfiguration')
+            ->with(null)
+            ->willReturn([
+                'mode' => PronosticScoringService::MODE_CONSERVATIVE,
+                'weights' => [
+                    'position' => 45.0,
+                    'odds' => 25.0,
+                    'performance' => 15.0,
+                    'earnings' => 10.0,
+                    'age' => 5.0,
+                ],
+            ]);
+
+        $request = new Request();
+
         $controller = new PronosticController();
-        $response = $controller->show($race, $snapshotService, $comparisonService);
+        $response = $controller->show($request, $race, $snapshotService, $comparisonService, $scoringService);
 
         self::assertSame(200, $response->getStatusCode());
 
@@ -65,5 +84,7 @@ class PronosticControllerTest extends TestCase
         self::assertSame(6, $payload['count']);
         self::assertSame('Horse 1', $payload['top'][0]['horse_name']);
         self::assertSame('Horse 5', $payload['top'][4]['horse_name']);
+        self::assertSame('conservative', $payload['scoring']['mode']);
+        self::assertEquals(45.0, $payload['scoring']['weights']['position']);
     }
 }

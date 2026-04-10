@@ -48,6 +48,21 @@ class PronosticSnapshot
     #[ORM\Column(name: 'comparable_entries')]
     private int $comparableEntries = 0;
 
+    #[ORM\Column(name: 'scoring_mode', length: 20)]
+    private string $scoringMode = 'conservative';
+
+    /**
+     * @var array<string, float>
+     */
+    #[ORM\Column(name: 'scoring_weights', type: 'json')]
+    private array $scoringWeights = [
+        'position' => 45.0,
+        'odds' => 25.0,
+        'performance' => 15.0,
+        'earnings' => 10.0,
+        'age' => 5.0,
+    ];
+
     /**
      * @var Collection<int, PronosticPrediction>
      */
@@ -159,6 +174,42 @@ class PronosticSnapshot
     public function setComparableEntries(int $comparableEntries): self
     {
         $this->comparableEntries = max(0, $comparableEntries);
+
+        return $this;
+    }
+
+    public function getScoringMode(): string
+    {
+        return $this->scoringMode;
+    }
+
+    public function setScoringMode(string $scoringMode): self
+    {
+        $normalized = strtolower(trim($scoringMode));
+        $this->scoringMode = $normalized !== '' ? $normalized : 'conservative';
+
+        return $this;
+    }
+
+    /**
+     * @return array<string, float>
+     */
+    public function getScoringWeights(): array
+    {
+        return $this->scoringWeights;
+    }
+
+    /**
+     * @param array<string, float|int|string> $scoringWeights
+     */
+    public function setScoringWeights(array $scoringWeights): self
+    {
+        $weights = [];
+        foreach (['position', 'odds', 'performance', 'earnings', 'age'] as $key) {
+            $weights[$key] = max(0.0, (float) ($scoringWeights[$key] ?? 0.0));
+        }
+
+        $this->scoringWeights = $weights;
 
         return $this;
     }

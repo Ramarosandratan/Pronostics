@@ -101,6 +101,77 @@ class PronosticScoringServiceTest extends TestCase
         self::assertSame(0.0, $rankings[1]['score']);
     }
 
+    public function testScoreRaceSupportsAggressiveModeWithCustomProfiles(): void
+    {
+        $race = (new Race())
+            ->setHippodrome('AUTEUIL')
+            ->setMeetingNumber(3)
+            ->setRaceNumber(6);
+
+        $positionHorse = $this->buildParticipation($race, [
+            'horseName' => 'POSITION_FIRST',
+            'saddleNumber' => 1,
+            'finishingPosition' => 1,
+            'odds' => 12.0,
+            'performanceIndicator' => '15',
+            'ageAtRace' => 8,
+            'careerEarnings' => '1200',
+        ]);
+        $oddsHorse = $this->buildParticipation($race, [
+            'horseName' => 'ODDS_FIRST',
+            'saddleNumber' => 2,
+            'finishingPosition' => 2,
+            'odds' => 2.0,
+            'performanceIndicator' => '15',
+            'ageAtRace' => 8,
+            'careerEarnings' => '1200',
+        ]);
+
+        $query = $this->createMock(Query::class);
+        $query->method('setParameter')->willReturnSelf();
+        $query->method('getResult')->willReturn([$positionHorse, $oddsHorse]);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('createQuery')->willReturn($query);
+
+        $profiles = [
+            PronosticScoringService::MODE_CONSERVATIVE => [
+                'position' => 80,
+                'odds' => 5,
+                'performance' => 5,
+                'earnings' => 5,
+                'age' => 5,
+            ],
+            PronosticScoringService::MODE_AGGRESSIVE => [
+                'position' => 10,
+                'odds' => 80,
+                'performance' => 5,
+                'earnings' => 3,
+                'age' => 2,
+            ],
+        ];
+
+        $service = new PronosticScoringService($entityManager, $profiles, PronosticScoringService::MODE_CONSERVATIVE);
+
+        $conservativeRankings = $service->scoreRace($race, PronosticScoringService::MODE_CONSERVATIVE);
+        $aggressiveRankings = $service->scoreRace($race, PronosticScoringService::MODE_AGGRESSIVE);
+
+        self::assertSame('POSITION_FIRST', $conservativeRankings[0]['horse_name']);
+        self::assertSame('ODDS_FIRST', $aggressiveRankings[0]['horse_name']);
+    }
+
+    public function testResolveScoringConfigurationFallsBackToConservativeForUnknownMode(): void
+    {
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $service = new PronosticScoringService($entityManager, [], PronosticScoringService::MODE_CONSERVATIVE);
+
+        $configuration = $service->resolveScoringConfiguration('unknown-mode');
+
+        self::assertSame(PronosticScoringService::MODE_CONSERVATIVE, $configuration['mode']);
+        self::assertSame(45.0, $configuration['weights']['position']);
+        self::assertSame(25.0, $configuration['weights']['odds']);
+    }
+
     /**
      * @param array{
      *     horseName: string,
