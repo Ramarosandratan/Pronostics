@@ -73,6 +73,8 @@ class PronosticKpiService
                 'comparable_entries' => $snapshot->getComparableEntries(),
                 'metrics' => $metricMap,
                 'compared_at' => $snapshot->getComparedAt(),
+                'scoring_mode' => $snapshot->getScoringMode(),
+                'scoring_weights' => $snapshot->getScoringWeights(),
             ];
         }
 

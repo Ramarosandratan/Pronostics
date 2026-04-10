@@ -8,7 +8,9 @@ use App\Entity\Participation;
 use App\Entity\Person;
 use App\Entity\Race;
 use App\Service\PronosticComparisonService;
+use App\Service\PronosticCsvExportService;
 use App\Service\PronosticKpiService;
+use App\Service\PronosticScoringService;
 use App\Service\PronosticSnapshotService;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -16,6 +18,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/gestion')]
@@ -316,19 +319,46 @@ class ManagementController extends AbstractController
 
     #[Route('/courses/{id}/pronostic', name: 'app_management_race_pronostic', methods: ['GET'])]
     public function racePronostic(
+        Request $request,
         Race $race,
         PronosticSnapshotService $snapshotService,
         PronosticComparisonService $comparisonService,
+        PronosticScoringService $scoringService,
     ): Response
     {
-        $rankings = $snapshotService->capturePreRaceSnapshot($race);
+        $configuration = $scoringService->resolveScoringConfiguration($request->query->get('mode'));
+        $rankings = $snapshotService->capturePreRaceSnapshot($race, $configuration['mode']);
         $comparisonService->compareRace($race);
 
         return $this->render('manage/pronostic.html.twig', [
             'race' => $race,
             'topRankings' => array_slice($rankings, 0, 5),
             'rankings' => $rankings,
+            'scoringMode' => $configuration['mode'],
+            'scoringWeights' => $configuration['weights'],
         ]);
+    }
+
+    #[Route('/courses/{id}/pronostic/export', name: 'app_management_race_pronostic_export', methods: ['GET'])]
+    public function exportRacePronostic(
+        Request $request,
+        Race $race,
+        PronosticSnapshotService $snapshotService,
+        PronosticScoringService $scoringService,
+        PronosticCsvExportService $csvExportService,
+    ): StreamedResponse
+    {
+        $configuration = $scoringService->resolveScoringConfiguration($request->query->get('mode'));
+        $rankings = $snapshotService->capturePreRaceSnapshot($race, $configuration['mode']);
+
+        $raceDate = $race->getRaceDate()?->format('Ymd') ?? 'unknown';
+        $filename = sprintf('pronostic-course-%d-%s-%s.csv', $race->getId() ?? 0, $raceDate, $configuration['mode']);
+
+        return $csvExportService->createCsvResponse(
+            $filename,
+            $csvExportService->raceHeaders(),
+            $csvExportService->raceRows($rankings, $configuration['mode'], $configuration['weights'])
+        );
     }
 
     #[Route('/dashboard', name: 'app_management_dashboard', methods: ['GET'])]
@@ -350,6 +380,33 @@ class ManagementController extends AbstractController
                 'to' => $to?->format('Y-m-d') ?? $toInput,
             ],
         ]);
+    }
+
+    #[Route('/dashboard/export', name: 'app_management_dashboard_export', methods: ['GET'])]
+    public function exportDashboard(
+        Request $request,
+        PronosticKpiService $kpiService,
+        PronosticCsvExportService $csvExportService,
+    ): StreamedResponse
+    {
+        $fromInput = trim((string) $request->query->get('from', ''));
+        $toInput = trim((string) $request->query->get('to', ''));
+
+        $from = $this->parseDate($fromInput);
+        $to = $this->parseDate($toInput);
+        $data = $kpiService->buildDashboard($from, $to);
+
+        $filename = sprintf(
+            'dashboard-pronostics-%s-%s.csv',
+            $from?->format('Ymd') ?? 'all',
+            $to?->format('Ymd') ?? 'all'
+        );
+
+        return $csvExportService->createCsvResponse(
+            $filename,
+            $csvExportService->dashboardHeaders(),
+            $csvExportService->dashboardRows($data['recent'])
+        );
     }
 
     private function parseDate(string $date): ?\DateTimeImmutable

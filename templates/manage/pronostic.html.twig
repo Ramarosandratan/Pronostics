@@ -16,7 +16,15 @@
         </p>
         <p>
             Endpoint JSON:
-            <a href="{{ path('app_pronostic_show', {id: race.id}) }}">{{ path('app_pronostic_show', {id: race.id}) }}</a>
+            <a href="{{ path('app_pronostic_show', {id: race.id, mode: scoringMode}) }}">{{ path('app_pronostic_show', {id: race.id, mode: scoringMode}) }}</a>
+        </p>
+        <p class="muted">Mode actif: {{ scoringMode }}</p>
+        <p>
+            <a href="{{ path('app_management_race_pronostic', {id: race.id, mode: 'conservative'}) }}">Mode conservateur</a>
+            |
+            <a href="{{ path('app_management_race_pronostic', {id: race.id, mode: 'aggressive'}) }}">Mode agressif</a>
+            |
+            <a href="{{ path('app_management_race_pronostic_export', {id: race.id, mode: scoringMode}) }}">Exporter CSV</a>
         </p>
     </section>
 
@@ -55,11 +63,11 @@
                 <tr>
                     <th>Rang</th>
                     <th>Cheval</th>
-                    <th>Position (45%)</th>
-                    <th>Cote (25%)</th>
-                    <th>Performance (15%)</th>
-                    <th>Gains (10%)</th>
-                    <th>Age (5%)</th>
+                    <th>Position ({{ scoringWeights.position|number_format(1, '.', ' ') }}%)</th>
+                    <th>Cote ({{ scoringWeights.odds|number_format(1, '.', ' ') }}%)</th>
+                    <th>Performance ({{ scoringWeights.performance|number_format(1, '.', ' ') }}%)</th>
+                    <th>Gains ({{ scoringWeights.earnings|number_format(1, '.', ' ') }}%)</th>
+                    <th>Age ({{ scoringWeights.age|number_format(1, '.', ' ') }}%)</th>
                     <th>Total</th>
                 </tr>
             </thead>
