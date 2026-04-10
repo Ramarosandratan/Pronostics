@@ -20,6 +20,82 @@
                 font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
                 background: linear-gradient(180deg, #eef3ff 0%, var(--bg) 100%);
                 color: var(--text);
+                padding-top: 60px;
+            }
+            .navbar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: var(--surface);
+                border-bottom: 2px solid var(--line);
+                z-index: 1000;
+                height: 60px;
+                display: flex;
+                align-items: center;
+                padding: 0 20px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            }
+            .navbar-brand {
+                font-weight: 700;
+                font-size: 1.2rem;
+                color: var(--accent);
+                text-decoration: none;
+                margin-right: 30px;
+                white-space: nowrap;
+                padding-right: 20px;
+                border-right: 2px solid var(--line);
+            }
+            .navbar-links {
+                display: flex;
+                gap: 0;
+                flex: 1;
+                align-items: center;
+                height: 100%;
+                list-style: none;
+                margin: 0;
+                padding: 0;
+            }
+            .navbar-group {
+                display: flex;
+                align-items: center;
+                height: 100%;
+                gap: 0;
+                border-right: 1px solid var(--line);
+                padding-right: 20px;
+                margin-right: 20px;
+            }
+            .navbar-group:last-child {
+                border-right: none;
+            }
+            .navbar-link {
+                text-decoration: none;
+                color: var(--text);
+                font-weight: 500;
+                padding: 0 12px;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                transition: color 0.2s ease, background 0.2s ease;
+                white-space: nowrap;
+                position: relative;
+            }
+            .navbar-link:hover {
+                color: var(--accent);
+            }
+            .navbar-link::after {
+                content: '';
+                position: absolute;
+                bottom: 0;
+                left: 12px;
+                right: 12px;
+                height: 3px;
+                background: var(--accent);
+                opacity: 0;
+                transition: opacity 0.2s ease;
+            }
+            .navbar-link:hover::after {
+                opacity: 1;
             }
             .container {
                 max-width: 1100px;
@@ -123,19 +199,28 @@
         </style>
     </head>
     <body>
+        <nav class="navbar">
+            <a href="{{ path('app_management_index') }}" class="navbar-brand">📊 Pronostics</a>
+            <ul class="navbar-links">
+                <div class="navbar-group">
+                    <a href="{{ path('app_home') }}" class="navbar-link">Accueil</a>
+                </div>
+                <div class="navbar-group">
+                    <a href="{{ path('app_management_people') }}" class="navbar-link">👤 Personnes</a>
+                    <a href="{{ path('app_management_horses') }}" class="navbar-link">🐴 Chevaux</a>
+                    <a href="{{ path('app_management_races') }}" class="navbar-link">🏁 Courses</a>
+                    <a href="{{ path('app_management_participations') }}" class="navbar-link">📝 Participations</a>
+                    <a href="{{ path('app_management_hippodromes') }}" class="navbar-link">🏇 Hippodromes</a>
+                </div>
+                <div class="navbar-group">
+                    <a href="{{ path('app_management_import_sessions') }}" class="navbar-link">📥 Imports</a>
+                    <a href="{{ path('app_management_normalization') }}" class="navbar-link">✓ Normalisation</a>
+                    <a href="{{ path('app_management_dashboard') }}" class="navbar-link">📈 Dashboard KPI</a>
+                </div>
+            </ul>
+        </nav>
+
         <div class="container">
-            <nav class="topbar">
-                <a href="{{ path('app_home') }}">Accueil app</a>
-                <a href="{{ path('app_management_index') }}">Gestion</a>
-                <a href="{{ path('app_management_people') }}">Personnes</a>
-                <a href="{{ path('app_management_horses') }}">Chevaux</a>
-                <a href="{{ path('app_management_races') }}">Courses</a>
-                <a href="{{ path('app_management_participations') }}">Participations</a>
-                <a href="{{ path('app_management_hippodromes') }}">Hippodromes</a>
-                <a href="{{ path('app_management_import_sessions') }}">Imports</a>
-                <a href="{{ path('app_management_normalization') }}">Normalisation</a>
-                <a href="{{ path('app_management_dashboard') }}">Dashboard KPI</a>
-            </nav>
 
             {% for message in app.flashes('success') %}
                 <div class="flash success">{{ message }}</div>
