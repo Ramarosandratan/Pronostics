@@ -30,7 +30,14 @@ class PronosticSnapshotService
 
         try {
             $snapshot = $this->findOrCreateSnapshot($race);
+            $hadExistingRows = !$snapshot->getPredictions()->isEmpty() || !$snapshot->getMetrics()->isEmpty();
             $this->prepareSnapshot($snapshot, count($rankings), $configuration['mode'], $configuration['weights']);
+
+            // Ensure orphan removals are flushed before inserting refreshed rows with the same unique keys.
+            if ($hadExistingRows) {
+                $this->entityManager->flush();
+            }
+
             $participationById = $this->loadParticipationMap($race);
             $this->attachPredictions($snapshot, $rankings, $participationById);
 
