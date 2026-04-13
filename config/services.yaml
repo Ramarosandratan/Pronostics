@@ -9,6 +9,7 @@
 parameters:
     app.data_quality.min_confidence: 0.75
     app.pronostic_scoring.default_mode: 'conservative'
+    app.ml.win_probability_model_path: '%kernel.project_dir%/var/ml/win_probability_model.json'
     app.pronostic_scoring.profiles:
         conservative:
             position: 45
@@ -70,6 +71,10 @@ services:
         arguments:
             $scoringProfiles: '%app.pronostic_scoring.profiles%'
             $defaultMode: '%app.pronostic_scoring.default_mode%'
+
+    App\Service\WinProbabilityModelStore:
+        arguments:
+            $modelPath: '%app.ml.win_probability_model_path%'
 
     App\Service\DataQualityService:
         arguments:

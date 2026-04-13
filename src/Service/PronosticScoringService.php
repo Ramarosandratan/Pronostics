@@ -27,6 +27,7 @@ class PronosticScoringService
         private readonly EntityManagerInterface $entityManager,
         private readonly array $scoringProfiles = [],
         private readonly string $defaultMode = self::MODE_CONSERVATIVE,
+        private readonly ?WinProbabilityModelService $winProbabilityModelService = null,
     )
     {
     }
@@ -63,6 +64,7 @@ class PronosticScoringService
             $performanceScore = $this->performanceScore($participation->getPerformanceIndicator());
             $earningsScore = $this->directRangeScore(self::toFloat($participation->getCareerEarnings()), $earningsRange);
             $ageScore = $this->ageScore($participation->getAgeAtRace());
+            $mlProbability = $this->winProbabilityModelService?->predictParticipationProbability($participation, $fieldSize);
 
             $globalScore = (
                 ($positionScore * $weights['position'])
@@ -72,12 +74,17 @@ class PronosticScoringService
                 + ($ageScore * $weights['age'])
             ) / 100.0;
 
+            if ($mlProbability !== null) {
+                $globalScore = ($globalScore * 0.5) + (($mlProbability * 100.0) * 0.5);
+            }
+
             $scored[] = [
                 'participation_id' => $participation->getId(),
                 'horse_id' => $participation->getHorse()->getId(),
                 'horse_name' => $participation->getHorse()->getName(),
                 'saddle_number' => $participation->getSaddleNumber(),
                 'score' => round($globalScore, 2),
+                'ml_probability' => $mlProbability !== null ? round($mlProbability * 100.0, 2) : null,
                 'sub_scores' => [
                     'position' => round($positionScore, 2),
                     'odds' => round($oddsScore, 2),

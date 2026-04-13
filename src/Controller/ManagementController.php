@@ -13,6 +13,7 @@ use App\Service\DataQualityService;
 use App\Service\PronosticKpiService;
 use App\Service\PronosticScoringService;
 use App\Service\PronosticSnapshotService;
+use App\Service\PronosticUxService;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -325,18 +326,35 @@ class ManagementController extends AbstractController
         PronosticSnapshotService $snapshotService,
         PronosticComparisonService $comparisonService,
         PronosticScoringService $scoringService,
+        PronosticUxService $pronosticUxService,
     ): Response
     {
         $configuration = $scoringService->resolveScoringConfiguration($request->query->get('mode'));
         $rankings = $snapshotService->capturePreRaceSnapshot($race, $configuration['mode']);
+        $rankings = $pronosticUxService->enrichRankingsForUx($rankings);
         $comparisonService->compareRace($race);
+
+        $topRankings = array_slice($rankings, 0, 5);
+        $confidence = $pronosticUxService->buildRaceConfidence($rankings);
+        $topExplanations = [];
+        foreach ($topRankings as $row) {
+            $topExplanations[] = [
+                'rank' => (int) ($row['rank'] ?? 0),
+                'horse_name' => (string) ($row['horse_name'] ?? '-'),
+                'saddle_number' => $row['saddle_number'] ?? null,
+                'win_probability' => (float) ($row['win_probability'] ?? 0.0),
+                'text' => $pronosticUxService->buildExplanationText($row),
+            ];
+        }
 
         return $this->render('manage/pronostic.html.twig', [
             'race' => $race,
-            'topRankings' => array_slice($rankings, 0, 5),
+            'topRankings' => $topRankings,
             'rankings' => $rankings,
             'scoringMode' => $configuration['mode'],
             'scoringWeights' => $configuration['weights'],
+            'confidence' => $confidence,
+            'topExplanations' => $topExplanations,
         ]);
     }
 
