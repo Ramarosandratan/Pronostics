@@ -22,6 +22,30 @@ Application Symfony + Vue.js pour importer des donnees hippiques, gerer le refer
   - dashboard KPI
 - Endpoint JSON pour recuperer un pronostic de course.
 
+## Evolution cible: IA avancee et restitution utilisateur
+
+### 1) Machine Learning (avance)
+
+Si le volume de donnees devient important, une approche supervisee peut completer le scoring actuel:
+
+- Entrainer un modele predictif (ex: XGBoost, reseau de neurones) sur des milliers de courses historiques.
+- Donner au modele les caracteristiques de course (distance, terrain, hippodrome, forme recente, jockey/driver, etc.) et le resultat reel.
+- Laisser l algorithme apprendre les correlations utiles (ex: performance elevee d un jockey sur un type de distance).
+- Produire, pour les courses du jour, une probabilite de victoire et un classement des partants.
+
+### 2) Experience utilisateur (restitution)
+
+La qualite du pronostic ne suffit pas: l utilisateur doit comprendre le resultat pour lui faire confiance.
+
+- Classement suggere:
+  - Afficher le pronostic sous forme de Top 3 ou Top 5 des favoris.
+- Indice de confiance:
+  - Afficher une jauge ou un pourcentage (ex: Confiance 85% ou note en etoiles).
+  - Si la course est trop imprevisible (donnees insuffisantes ou signaux contradictoires), abaisser explicitement cet indice.
+- Explication textuelle (le "pourquoi"):
+  - Generer une phrase courte qui justifie le rang propose.
+  - Exemple: "Notre algorithme place le n 4 en tete grace a ses performances recentes sur cette distance et son affinite avec les terrains lourds."
+
 ## Stack technique
 
 - PHP `>= 8.2`
@@ -111,6 +135,16 @@ npm run watch
 ```bash
 php bin/phpunit
 ```
+
+### Machine learning
+
+Entrainer le modele de probabilite de victoire depuis les courses terminees:
+
+```bash
+php bin/console app:ml:train-win-model
+```
+
+Le modele est persiste dans `var/ml/win_probability_model.json` et est utilise automatiquement dans le scoring quand il est disponible.
 
 ### Build des assets
 
