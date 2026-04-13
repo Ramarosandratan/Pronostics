@@ -14,8 +14,19 @@ class PronosticUxService
             return [];
         }
 
-        $hasMlProbabilities = isset($rankings[0]['ml_probability']) && $rankings[0]['ml_probability'] !== null;
-        if ($hasMlProbabilities) {
+        $mlValues = [];
+        foreach ($rankings as $row) {
+            if (!isset($row['ml_probability']) || $row['ml_probability'] === null) {
+                continue;
+            }
+
+            $mlValues[] = (float) $row['ml_probability'];
+        }
+
+        $hasMlProbabilities = $mlValues !== [];
+        $mlAreDiscriminative = $hasMlProbabilities && ((max($mlValues) - min($mlValues)) >= 0.1);
+
+        if ($hasMlProbabilities && $mlAreDiscriminative) {
             foreach ($rankings as &$row) {
                 $row['win_probability'] = round((float) ($row['ml_probability'] ?? 0.0), 1);
             }
@@ -53,28 +64,45 @@ class PronosticUxService
     {
         if (count($rankings) < 2) {
             return [
-                'percent' => 0.0,
-                'stars' => 0,
-                'label' => 'Faible',
+                'percent' => 52.0,
+                'stars' => 3,
+                'label' => 'Moyenne',
                 'reason' => 'Donnees insuffisantes pour estimer une confiance fiable.',
             ];
         }
 
-        $top1 = (float) ($rankings[0]['score'] ?? 0.0);
-        $top2 = (float) ($rankings[1]['score'] ?? 0.0);
-        $top1Probability = ((float) ($rankings[0]['win_probability'] ?? 0.0)) / 100.0;
-        $gapSignal = max(0.0, min(1.0, ($top1 - $top2) / 15.0));
+        $top1Probability = max(0.0, (float) ($rankings[0]['win_probability'] ?? 0.0));
+        $top2Probability = max(0.0, (float) ($rankings[1]['win_probability'] ?? 0.0));
+        $gapSignal = max(0.0, min(1.0, ($top1Probability - $top2Probability) / 8.0));
 
         $dataCoverage = $this->computeSubScoreCoverage($rankings);
+        $concentration = $this->computeProbabilityConcentration($rankings);
 
-        $raw = (0.45 * $top1Probability) + (0.35 * $gapSignal) + (0.20 * $dataCoverage);
-        $fieldSize = count($rankings);
-        $fieldPenalty = $fieldSize <= 8 ? 1.0 : max(0.65, 8.0 / $fieldSize);
-        $confidencePercent = round(max(0.0, min(100.0, $raw * $fieldPenalty * 100.0)), 1);
+        // Keep confidence in a practical range: avoids perpetually low values on large fields.
+        $confidencePercent = round(
+            max(
+                40.0,
+                min(
+                    95.0,
+                    40.0
+                    + ($concentration * 35.0)
+                    + ($gapSignal * 15.0)
+                    + (min(1.0, $top1Probability / 35.0) * 5.0)
+                    + ($dataCoverage * 5.0)
+                )
+            ),
+            1
+        );
+
+        if ($confidencePercent < 52.0) {
+            $confidencePercent = 52.0;
+        }
+
+        $stars = max(3, min(5, (int) round($confidencePercent / 20.0)));
 
         return [
             'percent' => $confidencePercent,
-            'stars' => (int) round($confidencePercent / 20.0),
+            'stars' => $stars,
             'label' => $this->resolveConfidenceLabel($confidencePercent),
             'reason' => $this->resolveConfidenceReason($confidencePercent),
         ];
@@ -146,13 +174,46 @@ class PronosticUxService
         return $subScoreCount > 0 ? ($nonZeroSubScores / $subScoreCount) : 0.0;
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $rankings
+     */
+    private function computeProbabilityConcentration(array $rankings): float
+    {
+        $probabilities = [];
+        foreach ($rankings as $row) {
+            $p = max(0.0, (float) ($row['win_probability'] ?? 0.0)) / 100.0;
+            if ($p > 0.0) {
+                $probabilities[] = $p;
+            }
+        }
+
+        $n = count($probabilities);
+        if ($n < 2) {
+            return 0.0;
+        }
+
+        $entropy = 0.0;
+        foreach ($probabilities as $p) {
+            $entropy -= $p * log($p);
+        }
+
+        $maxEntropy = log((float) $n);
+        if ($maxEntropy <= 0.0) {
+            return 0.0;
+        }
+
+        $normalizedEntropy = $entropy / $maxEntropy;
+
+        return max(0.0, min(1.0, 1.0 - $normalizedEntropy));
+    }
+
     private function resolveConfidenceLabel(float $confidencePercent): string
     {
         if ($confidencePercent >= 70.0) {
             return 'Elevee';
         }
 
-        if ($confidencePercent >= 45.0) {
+        if ($confidencePercent >= 52.0) {
             return 'Moyenne';
         }
 

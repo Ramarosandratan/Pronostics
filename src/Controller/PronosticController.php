@@ -6,6 +6,7 @@ use App\Entity\Race;
 use App\Service\PronosticComparisonService;
 use App\Service\PronosticScoringService;
 use App\Service\PronosticSnapshotService;
+use App\Service\PronosticUxService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,10 +21,18 @@ class PronosticController extends AbstractController
         PronosticSnapshotService $snapshotService,
         PronosticComparisonService $comparisonService,
         PronosticScoringService $scoringService,
+        PronosticUxService $pronosticUxService,
     ): JsonResponse
     {
         $configuration = $scoringService->resolveScoringConfiguration($request->query->get('mode'));
         $rankings = $snapshotService->capturePreRaceSnapshot($race, $configuration['mode']);
+        $rankings = $pronosticUxService->enrichRankingsForUx($rankings);
+        foreach ($rankings as &$ranking) {
+            $ranking['raw_score'] = (float) ($ranking['score'] ?? 0.0);
+        }
+        unset($ranking);
+
+        $confidence = $pronosticUxService->buildRaceConfidence($rankings);
         $comparisonService->compareRace($race);
 
         return new JsonResponse([
@@ -38,6 +47,7 @@ class PronosticController extends AbstractController
             'top' => array_slice($rankings, 0, 5),
             'rankings' => $rankings,
             'count' => count($rankings),
+            'confidence' => $confidence,
             'scoring' => [
                 'mode' => $configuration['mode'],
                 'weights' => $configuration['weights'],
