@@ -251,6 +251,12 @@ Mode automatique (sans saisir les URL une par une):
 php bin/console app:scrape:races letrot --letrot-auto --dry-run
 ```
 
+Mode automatique sur une plage de dates (historique):
+
+```bash
+php bin/console app:scrape:races letrot --letrot-auto --letrot-from-date=2026-01-01 --letrot-to-date=2026-04-13 --force-reimport
+```
+
 Par defaut, une course est ignoree si son payload Letrot est inchange (hash identique), ce qui accelere fortement les relances.
 
 Forcer la reimportation d une course deja chargee:

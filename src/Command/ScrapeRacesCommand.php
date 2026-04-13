@@ -45,6 +45,8 @@ final class ScrapeRacesCommand extends Command
             ->addOption('letrot-course', null, InputOption::VALUE_REQUIRED, 'Numero de course Letrot (C1, C2...) depuis une URL programme', '1')
             ->addOption('letrot-auto', null, InputOption::VALUE_NONE, 'Mode automatique Letrot: detecte les reunions du jour et importe toutes les courses')
             ->addOption('letrot-date', null, InputOption::VALUE_REQUIRED, 'Date cible Letrot en mode auto (YYYY-MM-DD), par defaut: date du jour')
+            ->addOption('letrot-from-date', null, InputOption::VALUE_REQUIRED, 'Date debut Letrot en mode auto (YYYY-MM-DD)')
+            ->addOption('letrot-to-date', null, InputOption::VALUE_REQUIRED, 'Date fin Letrot en mode auto (YYYY-MM-DD)')
             ->addOption('letrot-limit-meetings', null, InputOption::VALUE_REQUIRED, 'Limite le nombre de reunions en mode auto (0 = pas de limite)', '0')
             ->addOption('letrot-limit-races', null, InputOption::VALUE_REQUIRED, 'Limite le nombre de courses par reunion en mode auto (0 = pas de limite)', '0')
             ->addOption('force-reimport', null, InputOption::VALUE_NONE, 'Reimporte meme les courses deja presentes en base');
@@ -71,38 +73,47 @@ final class ScrapeRacesCommand extends Command
 
     private function runLetrotAuto(InputInterface $input, SymfonyStyle $io): int
     {
-        $statusCode = Command::SUCCESS;
         $sourceName = (string) ($input->getArgument('source') ?? '');
         if ($sourceName !== '' && $sourceName !== 'letrot') {
             $io->error('Le mode --letrot-auto ne peut etre utilise qu avec la source letrot.');
-            $statusCode = Command::FAILURE;
+            return Command::FAILURE;
         }
 
-        if ($statusCode !== Command::SUCCESS) {
-            return $statusCode;
+        $options = $this->resolveLetrotAutoOptions($input, $io);
+        if (!is_array($options)) {
+            return Command::INVALID;
         }
-
-        $dryRun = (bool) $input->getOption('dry-run');
-        $targetDate = (string) ($input->getOption('letrot-date') ?: date('Y-m-d'));
-        $limitMeetings = max(0, (int) $input->getOption('letrot-limit-meetings'));
-        $limitRaces = max(0, (int) $input->getOption('letrot-limit-races'));
-        $forceReimport = (bool) $input->getOption('force-reimport');
 
         $io->title('Scraping automatique Letrot');
-        $io->text(sprintf('Date cible: %s', $targetDate));
-        $io->text(sprintf('Mode: %s', $dryRun ? 'dry-run (aucune ecriture)' : 'import reel'));
+        if ($options['isRange']) {
+            $io->text(sprintf('Plage cible: %s -> %s', $options['fromDate'], $options['toDate']));
+        } else {
+            $io->text(sprintf('Date cible: %s', $options['targetDate']));
+        }
+        $io->text(sprintf('Mode: %s', $options['dryRun'] ? 'dry-run (aucune ecriture)' : 'import reel'));
 
+        $statusCode = Command::SUCCESS;
         try {
-            $programmeUrls = $this->letrotScraper->discoverProgrammeUrlsForDate($targetDate);
-            if ($limitMeetings > 0) {
-                $programmeUrls = array_slice($programmeUrls, 0, $limitMeetings);
-            }
+            $programmeUrls = $this->resolveProgrammeUrls(
+                $options['targetDate'],
+                $options['fromDate'],
+                $options['toDate'],
+                $options['isRange'],
+                $options['limitMeetings']
+            );
 
             if ($programmeUrls === []) {
                 $io->warning('Aucune reunion Letrot detectee pour cette date.');
                 $statusCode = Command::SUCCESS;
             } else {
-                $aggregate = $this->processAutoMeetings($programmeUrls, $limitRaces, $input, $io, $dryRun, $forceReimport);
+                $aggregate = $this->processAutoMeetings(
+                    $programmeUrls,
+                    $options['limitRaces'],
+                    $input,
+                    $io,
+                    $options['dryRun'],
+                    $options['forceReimport']
+                );
                 $io->success('Scraping automatique Letrot termine.');
                 $io->table(
                     ['Metrique', 'Valeur'],
@@ -125,6 +136,93 @@ final class ScrapeRacesCommand extends Command
         }
 
         return $statusCode;
+    }
+
+    /**
+     * @return array{dryRun: bool, targetDate: string, fromDate: string, toDate: string, isRange: bool, limitMeetings: int, limitRaces: int, forceReimport: bool}|null
+     */
+    private function resolveLetrotAutoOptions(InputInterface $input, SymfonyStyle $io): ?array
+    {
+        $targetDate = (string) ($input->getOption('letrot-date') ?: date('Y-m-d'));
+        $fromDate = trim((string) ($input->getOption('letrot-from-date') ?? ''));
+        $toDate = trim((string) ($input->getOption('letrot-to-date') ?? ''));
+        $isRange = $fromDate !== '' && $toDate !== '';
+
+        if ($fromDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate)) {
+            $io->error('Format invalide pour --letrot-from-date (attendu YYYY-MM-DD).');
+
+            return null;
+        }
+        if ($toDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate)) {
+            $io->error('Format invalide pour --letrot-to-date (attendu YYYY-MM-DD).');
+
+            return null;
+        }
+
+        return [
+            'dryRun' => (bool) $input->getOption('dry-run'),
+            'targetDate' => $targetDate,
+            'fromDate' => $fromDate,
+            'toDate' => $toDate,
+            'isRange' => $isRange,
+            'limitMeetings' => max(0, (int) $input->getOption('letrot-limit-meetings')),
+            'limitRaces' => max(0, (int) $input->getOption('letrot-limit-races')),
+            'forceReimport' => (bool) $input->getOption('force-reimport'),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function resolveProgrammeUrls(
+        string $targetDate,
+        string $fromDate,
+        string $toDate,
+        bool $isRange,
+        int $limitMeetings
+    ): array {
+        $programmeUrls = [];
+
+        if ($isRange) {
+            $dates = $this->buildDateRange($fromDate, $toDate);
+            foreach ($dates as $date) {
+                $programmeUrls = array_merge($programmeUrls, $this->letrotScraper->discoverProgrammeUrlsForDate($date));
+            }
+            $programmeUrls = array_values(array_unique($programmeUrls));
+            sort($programmeUrls);
+        } else {
+            $programmeUrls = $this->letrotScraper->discoverProgrammeUrlsForDate($targetDate);
+        }
+
+        if ($limitMeetings > 0) {
+            $programmeUrls = array_slice($programmeUrls, 0, $limitMeetings);
+        }
+
+        return $programmeUrls;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function buildDateRange(string $fromDate, string $toDate): array
+    {
+        $start = \DateTimeImmutable::createFromFormat('!Y-m-d', trim($fromDate));
+        $end = \DateTimeImmutable::createFromFormat('!Y-m-d', trim($toDate));
+        if (!$start instanceof \DateTimeImmutable || !$end instanceof \DateTimeImmutable) {
+            throw new \InvalidArgumentException('Plage de dates Letrot invalide.');
+        }
+        if ($start > $end) {
+            throw new \InvalidArgumentException('La date de debut doit etre anterieure ou egale a la date de fin.');
+        }
+
+        $cursor = $start;
+        $dates = [];
+        while ($cursor <= $end) {
+            $dates[] = $cursor->format('Y-m-d');
+            $cursor = $cursor->modify('+1 day');
+        }
+
+        return $dates;
     }
 
     /**

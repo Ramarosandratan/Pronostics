@@ -37,6 +37,7 @@ final class DataQualityReportCommand extends Command
                 ['Seuil minimum', sprintf(self::PERCENT_FORMAT, $summary['min_confidence'] * 100)],
                 ['Courses scrapees', (string) $summary['scraped_races']],
                 ['Participations scrapees', (string) $summary['scraped_participations']],
+                ['Courses sans etat import', (string) ($summary['races_without_import_state'] ?? 0)],
                 ['Dernier import', (string) ($summary['last_imported_at'] ?? '-')],
             ]
         );
