@@ -7,6 +7,7 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    app.data_quality.min_confidence: 0.75
     app.pronostic_scoring.default_mode: 'conservative'
     app.pronostic_scoring.profiles:
         conservative:
@@ -21,6 +22,38 @@ parameters:
             performance: 20
             earnings: 10
             age: 5
+    app.race_scraper.sources:
+        letrot:
+            url: 'https://www.letrot.com/courses/programme/2026-04-13/6102'
+            selectors:
+                provider: 'letrot'
+
+        # Exemple de source a adapter selon la structure HTML du site cible.
+        # Pour un attribut HTML, utiliser le format "selecteur@attribut".
+        exemple_site:
+            url: 'https://example.com/reunion/123/course/4'
+            selectors:
+                race:
+                    hippodrome: '.race-header .hippodrome'
+                    meeting_number: '.race-header .meeting-number'
+                    race_number: '.race-header .race-number'
+                    race_date: '.race-header .race-date'
+                    discipline: '.race-header .discipline'
+                participants:
+                    row_selector: 'table.partants tbody tr'
+                    fields:
+                        saddle_number: '.number'
+                        horse_name: '.horse-name'
+                        sex: '.sex'
+                        age_at_race: '.age'
+                        jockey: '.jockey'
+                        trainer: '.trainer'
+                        owner: '.owner'
+                        distance_or_weight: '.distance'
+                        shoeing_or_draw: '.shoeing'
+                        performance_indicator: '.performance'
+                        music: '.music'
+                        career_earnings: '.earnings'
 
 services:
     # default configuration for services in *this* file
@@ -37,6 +70,10 @@ services:
         arguments:
             $scoringProfiles: '%app.pronostic_scoring.profiles%'
             $defaultMode: '%app.pronostic_scoring.default_mode%'
+
+    App\Service\DataQualityService:
+        arguments:
+            $minConfidence: '%app.data_quality.min_confidence%'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
