@@ -35,8 +35,9 @@ final class ScrapedRaceImportService
             $importContext['hippodrome_name'] === null
             || $importContext['meeting_number'] === null
             || $importContext['race_number'] === null
+            || !$importContext['race_date'] instanceof \DateTimeImmutable
         ) {
-            throw new ImportException('Donnees course invalides: hippodrome, meeting_number et race_number sont requis.');
+            throw new ImportException('Donnees course invalides: hippodrome, meeting_number, race_number et race_date sont requis.');
         }
 
         $skipStats = $this->resolveSkipStats($importContext, $dryRun, $forceReimport);
@@ -68,6 +69,7 @@ final class ScrapedRaceImportService
                 $importContext['meeting_number'],
                 $importContext['race_number'],
                 $importContext['race_date'],
+                $importContext['source_date_code'],
                 $stats
             );
             $this->processParticipants($race, $importContext['participants'], $stats, $horseCache, $personCache);
@@ -77,15 +79,13 @@ final class ScrapedRaceImportService
             if ($dryRun) {
                 $connection->rollBack();
             } else {
-                if ($importContext['race_date'] !== null) {
-                    $this->upsertImportState(
-                        $importContext['race_date'],
-                        $importContext['meeting_number'],
-                        $importContext['race_number'],
-                        $importContext['payload_hash']
-                    );
-                    $this->entityManager->flush();
-                }
+                $this->upsertImportState(
+                    $importContext['race_date'],
+                    $importContext['meeting_number'],
+                    $importContext['race_number'],
+                    $importContext['payload_hash']
+                );
+                $this->entityManager->flush();
 
                 $connection->commit();
                 $this->comparisonService->compareRace($race);
@@ -153,6 +153,7 @@ final class ScrapedRaceImportService
      *   meeting_number: ?int,
      *   race_number: ?int,
      *   race_date: ?\DateTimeImmutable,
+     *   source_date_code: ?string,
      *   payload_hash: string
      * }
      */
@@ -160,6 +161,18 @@ final class ScrapedRaceImportService
     {
         $raceData = is_array($payload['race'] ?? null) ? $payload['race'] : [];
         $participants = is_array($payload['participants'] ?? null) ? $payload['participants'] : [];
+        $raceDate = $this->toDate($raceData['race_date'] ?? null);
+        $sourceDateCode = null;
+        $sourceDateCodeRaw = $this->stringOrNull($raceData['source_date_code'] ?? null);
+        if ($sourceDateCodeRaw !== null) {
+            $sourceDateCodeDigits = preg_replace('/\D+/', '', $sourceDateCodeRaw);
+            if (is_string($sourceDateCodeDigits) && strlen($sourceDateCodeDigits) === 8) {
+                $sourceDateCode = $sourceDateCodeDigits;
+            }
+        }
+        if ($sourceDateCode === null && $raceDate instanceof \DateTimeImmutable) {
+            $sourceDateCode = $raceDate->format('Ymd');
+        }
 
         return [
             'race_data' => $raceData,
@@ -167,7 +180,8 @@ final class ScrapedRaceImportService
             'hippodrome_name' => $this->stringOrNull($raceData['hippodrome'] ?? null),
             'meeting_number' => $this->toInt($raceData['meeting_number'] ?? null),
             'race_number' => $this->toInt($raceData['race_number'] ?? null),
-            'race_date' => $this->toDate($raceData['race_date'] ?? null),
+            'race_date' => $raceDate,
+            'source_date_code' => $sourceDateCode,
             'payload_hash' => $this->buildPayloadHash($payload),
         ];
     }
@@ -177,7 +191,7 @@ final class ScrapedRaceImportService
      *   participants: array<int, array<string, mixed>>,
      *   meeting_number: int,
      *   race_number: int,
-     *   race_date: ?\DateTimeImmutable,
+    *   race_date: \DateTimeImmutable,
      *   payload_hash: string
      * } $importContext
      *
@@ -187,7 +201,7 @@ final class ScrapedRaceImportService
     {
         $skipStats = null;
 
-        if (!$forceReimport && $importContext['race_date'] instanceof \DateTimeImmutable) {
+        if (!$forceReimport) {
             $raceDate = $importContext['race_date'];
             $meetingNumber = $importContext['meeting_number'];
             $raceNumber = $importContext['race_number'];
@@ -293,7 +307,8 @@ final class ScrapedRaceImportService
         Hippodrome $hippodrome,
         int $meetingNumber,
         int $raceNumber,
-        ?\DateTimeImmutable $raceDate,
+        \DateTimeImmutable $raceDate,
+        ?string $sourceDateCode,
         array &$stats
     ): Race {
         $race = $this->entityManager->getRepository(Race::class)->findOneBy([
@@ -309,10 +324,12 @@ final class ScrapedRaceImportService
                 ->setHippodrome($hippodrome)
                 ->setMeetingNumber($meetingNumber)
                 ->setRaceNumber($raceNumber)
-                ->setSourceDateCode($raceDate?->format('Ymd'));
+                ->setSourceDateCode($sourceDateCode ?? $raceDate->format('Ymd'));
             $this->entityManager->persist($race);
             ++$stats['races_created'];
         }
+
+        $race->setSourceDateCode($sourceDateCode ?? $raceDate->format('Ymd'));
 
         $race->setDiscipline($this->stringOrNull($raceData['discipline'] ?? null));
         $autostart = filter_var($raceData['autostart'] ?? null, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
@@ -543,11 +560,28 @@ final class ScrapedRaceImportService
             return null;
         }
 
-        try {
-            return new \DateTimeImmutable($normalized);
-        } catch (\Throwable) {
-            return null;
+        $resolved = null;
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y', 'Ymd'] as $format) {
+            $date = \DateTimeImmutable::createFromFormat('!'.$format, $normalized);
+            if ($date instanceof \DateTimeImmutable && $date->format($format) === $normalized) {
+                $resolved = $date;
+                break;
+            }
         }
+
+        if ($resolved instanceof \DateTimeImmutable) {
+            return $resolved;
+        }
+
+        foreach ([DATE_ATOM, 'Y-m-d\TH:i:sP', 'Y-m-d\TH:i:s.uP'] as $format) {
+            $date = \DateTimeImmutable::createFromFormat($format, $normalized);
+            if ($date instanceof \DateTimeImmutable) {
+                $resolved = $date->setTime(0, 0, 0);
+                break;
+            }
+        }
+
+        return $resolved;
     }
 }
 

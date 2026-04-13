@@ -8,6 +8,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'scrape_import_state')]
 #[ORM\UniqueConstraint(name: 'uniq_scrape_import_state_identity', columns: ['race_date', 'meeting_number', 'race_number'])]
 #[ORM\Index(name: 'idx_scrape_import_state_hash', columns: ['payload_hash'])]
+#[ORM\Index(name: 'idx_scrape_import_state_last_imported', columns: ['last_imported_at'])]
 class ScrapeImportState
 {
     #[ORM\Id]

@@ -14,7 +14,7 @@ final class DataQualityService
 
     /**
      * @return array{
-     *   summary: array{global_confidence: float, min_confidence: float, scraped_races: int, scraped_participations: int, last_imported_at: ?string},
+        *   summary: array{global_confidence: float, min_confidence: float, scraped_races: int, scraped_participations: int, last_imported_at: ?string, races_without_import_state: int},
      *   participation_metrics: list<array{field: string, label: string, filled: int, total: int, rate: float}>,
      *   race_metrics: list<array{field: string, label: string, filled: int, total: int, rate: float}>,
      *   alerts: list<string>
@@ -43,6 +43,7 @@ final class DataQualityService
         $scrapedRaces = $connection->fetchAssociative(
             "SELECT
                 COUNT(*) AS total,
+                SUM(CASE WHEN r.race_date IS NOT NULL THEN 1 ELSE 0 END) AS race_date_filled,
                 SUM(CASE WHEN r.discipline IS NOT NULL AND TRIM(r.discipline) <> '' THEN 1 ELSE 0 END) AS discipline_filled,
                 SUM(CASE WHEN r.distance_meters IS NOT NULL THEN 1 ELSE 0 END) AS distance_meters_filled,
                 SUM(CASE WHEN r.allocation IS NOT NULL THEN 1 ELSE 0 END) AS allocation_filled,
@@ -58,6 +59,16 @@ final class DataQualityService
                 AND s.race_number = r.race_number"
         ) ?: [];
 
+        $racesWithoutImportState = (int) $connection->fetchOne(
+            'SELECT COUNT(*)
+            FROM race r
+            LEFT JOIN scrape_import_state s
+                ON s.race_date = r.race_date
+                AND s.meeting_number = r.meeting_number
+                AND s.race_number = r.race_number
+            WHERE s.id IS NULL'
+        );
+
         $lastImportedAt = $connection->fetchOne('SELECT MAX(last_imported_at) FROM scrape_import_state');
 
         $participationTotal = (int) ($scrapedParticipations['total'] ?? 0);
@@ -72,6 +83,7 @@ final class DataQualityService
         ];
 
         $raceMetrics = [
+            $this->metric('race_date', 'Date course', (int) ($scrapedRaces['race_date_filled'] ?? 0), $raceTotal),
             $this->metric('discipline', 'Discipline', (int) ($scrapedRaces['discipline_filled'] ?? 0), $raceTotal),
             $this->metric('distance_meters', 'Distance (m)', (int) ($scrapedRaces['distance_meters_filled'] ?? 0), $raceTotal),
             $this->metric('allocation', 'Allocation', (int) ($scrapedRaces['allocation_filled'] ?? 0), $raceTotal),
@@ -92,6 +104,7 @@ final class DataQualityService
                 'scraped_races' => $raceTotal,
                 'scraped_participations' => $participationTotal,
                 'last_imported_at' => is_string($lastImportedAt) ? $lastImportedAt : null,
+                'races_without_import_state' => $racesWithoutImportState,
             ],
             'participation_metrics' => $participationMetrics,
             'race_metrics' => $raceMetrics,
@@ -157,6 +170,19 @@ final class DataQualityService
 
         if ($allMetrics === [] || ($participationMetrics[0]['total'] ?? 0) === 0) {
             $alerts[] = 'Aucune course scrapee detectee pour evaluer la qualite.';
+        }
+
+        $missingImportState = (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT COUNT(*)
+            FROM race r
+            LEFT JOIN scrape_import_state s
+                ON s.race_date = r.race_date
+                AND s.meeting_number = r.meeting_number
+                AND s.race_number = r.race_number
+            WHERE s.id IS NULL'
+        );
+        if ($missingImportState > 0) {
+            $alerts[] = sprintf('Courses sans etat d import: %d.', $missingImportState);
         }
 
         return $alerts;

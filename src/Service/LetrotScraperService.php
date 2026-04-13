@@ -39,7 +39,7 @@ final class LetrotScraperService
         foreach ($programmeData['race_urls'] as $raceUrl) {
             $raceHtml = $this->fetchHtml($raceUrl);
             $results[] = [
-                'payload' => $this->extractPayloadFromRaceHtml($raceHtml),
+                'payload' => $this->extractPayloadFromRaceHtml($raceHtml, $raceUrl),
                 'race_url' => $raceUrl,
                 'pdf_url' => $programmeData['pdf_url'],
                 'programme_url' => $programmeData['programme_url'],
@@ -87,7 +87,7 @@ final class LetrotScraperService
 
         if ($this->isRaceUrl($normalizedUrl)) {
             $html = $this->fetchHtml($normalizedUrl);
-            $payload = $this->extractPayloadFromRaceHtml($html);
+            $payload = $this->extractPayloadFromRaceHtml($html, $normalizedUrl);
 
             return [
                 'payload' => $payload,
@@ -105,7 +105,7 @@ final class LetrotScraperService
         $pdfUrl = $this->extractPdfUrl($programmeHtml);
 
         $raceHtml = $this->fetchHtml($raceUrl);
-        $payload = $this->extractPayloadFromRaceHtml($raceHtml);
+        $payload = $this->extractPayloadFromRaceHtml($raceHtml, $raceUrl);
 
         return [
             'payload' => $payload,
@@ -170,14 +170,14 @@ final class LetrotScraperService
     /**
      * @return array<string, mixed>
      */
-    private function extractPayloadFromRaceHtml(string $html): array
+    private function extractPayloadFromRaceHtml(string $html, ?string $raceUrl = null): array
     {
         $data = $this->decodeRaceDetailPayload($html);
         if (!is_array($data) || !is_array($data['raceResult'] ?? null)) {
             throw new ImportException('Impossible de decoder raceResult Letrot.');
         }
 
-        return $this->mapRaceResultToImportPayload($data['raceResult']);
+        return $this->mapRaceResultToImportPayload($data['raceResult'], $this->extractDateFromLetrotUrl($raceUrl));
     }
 
     /**
@@ -201,9 +201,10 @@ final class LetrotScraperService
      *
      * @return array<string, mixed>
      */
-    private function mapRaceResultToImportPayload(array $raceResult): array
+    private function mapRaceResultToImportPayload(array $raceResult, ?string $fallbackRaceDate = null): array
     {
         $participants = [];
+        $raceDate = $this->normalizeRaceDateValue($raceResult['dateCourse'] ?? null, $fallbackRaceDate);
 
         $partants = is_array($raceResult['partants'] ?? null) ? $raceResult['partants'] : [];
         foreach ($partants as $partant) {
@@ -234,7 +235,8 @@ final class LetrotScraperService
                 'hippodrome' => $this->stringOrNull($raceResult['nomHippodrome'] ?? null),
                 'meeting_number' => $raceResult['numReunion'] ?? null,
                 'race_number' => $raceResult['numCourse'] ?? null,
-                'race_date' => $this->stringOrNull($raceResult['dateCourse'] ?? null),
+                'race_date' => $raceDate,
+                'source_date_code' => $raceDate !== null ? str_replace('-', '', $raceDate) : null,
                 'discipline' => $this->stringOrNull($raceResult['discipline'] ?? null),
                 'distance_meters' => $raceResult['distance'] ?? null,
                 'allocation' => $raceResult['allocation'] ?? null,
@@ -257,6 +259,37 @@ final class LetrotScraperService
         $normalized = trim((string) $value);
 
         return $normalized !== '' ? $normalized : null;
+    }
+
+    private function normalizeRaceDateValue(mixed $value, ?string $fallbackRaceDate): ?string
+    {
+        $rawDate = $this->stringOrNull($value) ?? $fallbackRaceDate;
+        if ($rawDate === null) {
+            return null;
+        }
+
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y', 'Ymd'] as $format) {
+            $date = \DateTimeImmutable::createFromFormat('!'.$format, $rawDate);
+            if ($date instanceof \DateTimeImmutable && $date->format($format) === $rawDate) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        return null;
+    }
+
+    private function extractDateFromLetrotUrl(?string $url): ?string
+    {
+        if (!is_string($url) || trim($url) === '') {
+            return null;
+        }
+
+        $matches = [];
+        if (preg_match('#/courses/(?:programme/)?(\d{4}-\d{2}-\d{2})/#i', $url, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1];
     }
 
     /**

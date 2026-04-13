@@ -7,6 +7,8 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'race')]
 #[ORM\UniqueConstraint(name: 'uniq_race_identity', columns: ['race_date', 'hippodrome_id', 'meeting_number', 'race_number'])]
+#[ORM\Index(name: 'idx_race_date', columns: ['race_date'])]
+#[ORM\Index(name: 'idx_race_identity_lookup', columns: ['race_date', 'meeting_number', 'race_number'])]
 class Race
 {
     #[ORM\Id]
@@ -14,8 +16,8 @@ class Race
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(name: 'race_date', type: 'date_immutable', nullable: true)]
-    private ?\DateTimeImmutable $raceDate = null;
+    #[ORM\Column(name: 'race_date', type: 'date_immutable')]
+    private \DateTimeImmutable $raceDate;
 
     #[ORM\ManyToOne(targetEntity: Hippodrome::class)]
     #[ORM\JoinColumn(name: 'hippodrome_id', nullable: false, onDelete: 'RESTRICT')]
@@ -62,12 +64,12 @@ class Race
         return $this->id;
     }
 
-    public function getRaceDate(): ?\DateTimeImmutable
+    public function getRaceDate(): \DateTimeImmutable
     {
         return $this->raceDate;
     }
 
-    public function setRaceDate(?\DateTimeImmutable $raceDate): self
+    public function setRaceDate(\DateTimeImmutable $raceDate): self
     {
         $this->raceDate = $raceDate;
 
