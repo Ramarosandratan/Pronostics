@@ -1,0 +1,96 @@
+{% extends 'manage/base.html.twig' %}
+
+{% block title %}Gestion - Qualite des donnees{% endblock %}
+
+{% block body %}
+    <section class="card">
+        <h1>Qualite des donnees scrapees</h1>
+        <p class="muted">Controle de completude sur les courses et participations provenant du scraping.</p>
+
+        <div class="stats" style="margin-top: 12px;">
+            <div class="stat">
+                <strong>{{ (summary.global_confidence * 100)|number_format(1, '.', ' ') }}%</strong><br />
+                Confiance globale
+            </div>
+            <div class="stat">
+                <strong>{{ (summary.min_confidence * 100)|number_format(1, '.', ' ') }}%</strong><br />
+                Seuil minimum
+            </div>
+            <div class="stat">
+                <strong>{{ summary.scraped_races }}</strong><br />
+                Courses scrapees
+            </div>
+            <div class="stat">
+                <strong>{{ summary.scraped_participations }}</strong><br />
+                Participations scrapees
+            </div>
+            <div class="stat">
+                <strong>{{ summary.last_imported_at ?: '-' }}</strong><br />
+                Dernier import scraping
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Alertes</h2>
+        <ul>
+            {% for alert in alerts %}
+                <li>{{ alert }}</li>
+            {% else %}
+                <li>Aucune alerte detectee.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section class="card">
+        <h2>Completude participations</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Champ</th>
+                    <th>Completes</th>
+                    <th>Total</th>
+                    <th>Taux</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for metric in participationMetrics %}
+                    <tr>
+                        <td>{{ metric.label }}</td>
+                        <td>{{ metric.filled }}</td>
+                        <td>{{ metric.total }}</td>
+                        <td>{{ (metric.rate * 100)|number_format(1, '.', ' ') }}%</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4">Aucune donnee.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Completude courses</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Champ</th>
+                    <th>Completes</th>
+                    <th>Total</th>
+                    <th>Taux</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for metric in raceMetrics %}
+                    <tr>
+                        <td>{{ metric.label }}</td>
+                        <td>{{ metric.filled }}</td>
+                        <td>{{ metric.total }}</td>
+                        <td>{{ (metric.rate * 100)|number_format(1, '.', ' ') }}%</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="4">Aucune donnee.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

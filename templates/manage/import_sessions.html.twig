@@ -6,9 +6,17 @@
     <section class="card">
         <h1>Sessions d'import</h1>
         <p class="muted">Historique des imports executes via la commande app:import:races.</p>
+        <button id="sync-button" class="btn btn-primary">
+            <span id="sync-text">🔄 Synchroniser avec Excel</span>
+            <span id="sync-spinner" style="display: none;">⌛ Synchronisation en cours...</span>
+        </button>
     </section>
 
     <section class="card">
+        <div id="sync-message" style="display: none; margin-bottom: 1rem; padding: 1rem; border-radius: 4px;">
+            <p id="sync-message-text"></p>
+        </div>
+
         {% if sessions is empty %}
             <p class="muted">Aucune session d'import disponible.</p>
         {% else %}
@@ -44,4 +52,85 @@
             </table>
         {% endif %}
     </section>
+
+    <script>
+        document.getElementById('sync-button').addEventListener('click', async function() {
+            const button = document.getElementById('sync-button');
+            const syncText = document.getElementById('sync-text');
+            const syncSpinner = document.getElementById('sync-spinner');
+            const messageDiv = document.getElementById('sync-message');
+            const messageText = document.getElementById('sync-message-text');
+
+            button.disabled = true;
+            syncText.style.display = 'none';
+            syncSpinner.style.display = 'inline';
+
+            try {
+                const response = await fetch('{{ path("app_management_import_sync") }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+
+                const data = await response.json();
+
+                messageDiv.style.display = 'block';
+
+                if (data.success) {
+                    messageDiv.className = 'success-message';
+                    messageDiv.style.backgroundColor = '#d4edda';
+                    messageDiv.style.borderLeft = '4px solid #28a745';
+                    messageDiv.style.color = '#155724';
+                    messageText.innerHTML = `
+                        <strong>✓ Synchronisation réussie!</strong><br>
+                        Lignes importées: ${data.stats.rows_imported}/${data.stats.rows_total}<br>
+                        Lignes ignorées: ${data.stats.rows_skipped}<br>
+                        Erreurs: ${data.stats.error_count}
+                    `;
+                    // Reload page après 2 secondes pour voir les nouvelles sessions
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    messageDiv.className = 'error-message';
+                    messageDiv.style.backgroundColor = '#f8d7da';
+                    messageDiv.style.borderLeft = '4px solid #dc3545';
+                    messageDiv.style.color = '#721c24';
+                    messageText.innerHTML = `<strong>✗ Erreur:</strong> ${data.message}`;
+                }
+            } catch (error) {
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'error-message';
+                messageDiv.style.backgroundColor = '#f8d7da';
+                messageDiv.style.borderLeft = '4px solid #dc3545';
+                messageDiv.style.color = '#721c24';
+                messageText.innerHTML = `<strong>✗ Erreur:</strong> ${error.message}`;
+            } finally {
+                button.disabled = false;
+                syncText.style.display = 'inline';
+                syncSpinner.style.display = 'none';
+            }
+        });
+    </script>
+
+    <style>
+        #sync-button {
+            padding: 0.7rem 1rem;
+            border-radius: 4px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            background: #28a745;
+            color: #fff;
+            transition: background 0.3s ease;
+        }
+
+        #sync-button:hover:not(:disabled) {
+            background: #218838;
+        }
+
+        #sync-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
 {% endblock %}

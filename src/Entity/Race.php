@@ -33,6 +33,27 @@ class Race
     #[ORM\Column(length: 20, nullable: true)]
     private ?string $discipline = null;
 
+    #[ORM\Column(name: 'distance_meters', nullable: true)]
+    private ?int $distanceMeters = null;
+
+    #[ORM\Column(type: 'bigint', nullable: true)]
+    private ?string $allocation = null;
+
+    #[ORM\Column(name: 'race_category', length: 120, nullable: true)]
+    private ?string $category = null;
+
+    #[ORM\Column(name: 'race_time', length: 20, nullable: true)]
+    private ?string $raceTime = null;
+
+    #[ORM\Column(name: 'track_type', length: 120, nullable: true)]
+    private ?string $trackType = null;
+
+    #[ORM\Column(name: 'track_rope', length: 120, nullable: true)]
+    private ?string $trackRope = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?bool $autostart = null;
+
     #[ORM\Column(name: 'source_date_code', length: 30, nullable: true)]
     private ?string $sourceDateCode = null;
 
@@ -124,6 +145,90 @@ class Race
     public function setDiscipline(?string $discipline): self
     {
         $this->discipline = $discipline !== null ? trim($discipline) : null;
+
+        return $this;
+    }
+
+    public function getDistanceMeters(): ?int
+    {
+        return $this->distanceMeters;
+    }
+
+    public function setDistanceMeters(?int $distanceMeters): self
+    {
+        $this->distanceMeters = $distanceMeters;
+
+        return $this;
+    }
+
+    public function getAllocation(): ?string
+    {
+        return $this->allocation;
+    }
+
+    public function setAllocation(?string $allocation): self
+    {
+        $this->allocation = $allocation;
+
+        return $this;
+    }
+
+    public function getCategory(): ?string
+    {
+        return $this->category;
+    }
+
+    public function setCategory(?string $category): self
+    {
+        $this->category = $category !== null ? trim($category) : null;
+
+        return $this;
+    }
+
+    public function getRaceTime(): ?string
+    {
+        return $this->raceTime;
+    }
+
+    public function setRaceTime(?string $raceTime): self
+    {
+        $this->raceTime = $raceTime !== null ? trim($raceTime) : null;
+
+        return $this;
+    }
+
+    public function getTrackType(): ?string
+    {
+        return $this->trackType;
+    }
+
+    public function setTrackType(?string $trackType): self
+    {
+        $this->trackType = $trackType !== null ? trim($trackType) : null;
+
+        return $this;
+    }
+
+    public function getTrackRope(): ?string
+    {
+        return $this->trackRope;
+    }
+
+    public function setTrackRope(?string $trackRope): self
+    {
+        $this->trackRope = $trackRope !== null ? trim($trackRope) : null;
+
+        return $this;
+    }
+
+    public function isAutostart(): ?bool
+    {
+        return $this->autostart;
+    }
+
+    public function setAutostart(?bool $autostart): self
+    {
+        $this->autostart = $autostart;
 
         return $this;
     }

@@ -9,6 +9,7 @@ use App\Entity\Person;
 use App\Entity\Race;
 use App\Service\PronosticComparisonService;
 use App\Service\PronosticCsvExportService;
+use App\Service\DataQualityService;
 use App\Service\PronosticKpiService;
 use App\Service\PronosticScoringService;
 use App\Service\PronosticSnapshotService;
@@ -407,6 +408,19 @@ class ManagementController extends AbstractController
             $csvExportService->dashboardHeaders(),
             $csvExportService->dashboardRows($data['recent'])
         );
+    }
+
+    #[Route('/data-quality', name: 'app_management_data_quality', methods: ['GET'])]
+    public function dataQuality(DataQualityService $dataQualityService): Response
+    {
+        $report = $dataQualityService->buildReport();
+
+        return $this->render('manage/data_quality.html.twig', [
+            'summary' => $report['summary'],
+            'participationMetrics' => $report['participation_metrics'],
+            'raceMetrics' => $report['race_metrics'],
+            'alerts' => $report['alerts'],
+        ]);
     }
 
     private function parseDate(string $date): ?\DateTimeImmutable
